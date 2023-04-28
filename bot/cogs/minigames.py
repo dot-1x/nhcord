@@ -1,28 +1,17 @@
 from __future__ import annotations
 import asyncio
+from copy import copy
 import json
 from random import shuffle
 
 from typing import TYPE_CHECKING, Dict, List
-from discord import (
-    ApplicationContext,
-    CheckFailure,
-    Cog,
-    Colour,
-    Embed,
-    Message,
-    Role,
-    SlashCommandGroup,
-    option,
-    slash_command,
-    Member,
-)
+import discord
+from discord import Colour, slash_command, option
 from discord.ext.commands import Context
 
 from ..models.minigames.minigames_models import (
     RunningGame,
     BridgeGameView,
-    GLASS_GAME_FORMATTER,
 )
 from ..data.minigames import BridgeGameSettings
 
@@ -32,8 +21,8 @@ if TYPE_CHECKING:
 __all__ = ("MinigamesCog",)
 
 
-class MinigamesCog(Cog):
-    mg_game = SlashCommandGroup("mg", "Main commands for minigames related")
+class MinigamesCog(discord.Cog):
+    mg_game = discord.SlashCommandGroup("mg", "Main commands for minigames related")
 
     def __init__(self, bot: NhCord) -> None:
         self.bot = bot
@@ -44,21 +33,23 @@ class MinigamesCog(Cog):
             self.authorized: List[int] = setting["auth_command"]
         self.running_game: Dict[int, RunningGame] = {}
 
-    async def handle_err_message(self, ctx: ApplicationContext | Context, message: str):
-        if isinstance(ctx, ApplicationContext):
+    async def handle_err_message(
+        self, ctx: discord.ApplicationContext | Context, message: str
+    ):
+        if isinstance(ctx, discord.ApplicationContext):
             await ctx.response.send_message(message, ephemeral=True)
         else:
             await ctx.reply(message)
 
     async def cog_command_error(
-        self, ctx: ApplicationContext, error: Exception
+        self, ctx: discord.ApplicationContext, error: Exception
     ) -> None:
-        if isinstance(error, CheckFailure):
+        if isinstance(error, discord.CheckFailure):
             self.bot.log.warning(f"Check failed invoked by {ctx.author}")
         else:
             raise error
 
-    def cog_check(self, ctx: ApplicationContext | Context):
+    def cog_check(self, ctx: discord.ApplicationContext | Context):
         if ctx.author.id not in self.authorized:
             self.bot.loop.create_task(
                 self.handle_err_message(ctx, "You cannot perform this action")
@@ -72,19 +63,21 @@ class MinigamesCog(Cog):
                 return False
         return True
 
-    @Cog.listener()
-    async def on_message(self, msg: Message):
+    @discord.Cog.listener()
+    async def on_message(self, msg: discord.Message):
         if msg.author.bot:
             return
 
     # @mg_game.command(description="Initiate Squidgame")
-    # async def start(self, ctx: ApplicationContext):
+    # async def start(self, ctx: discord.ApplicationContext):
     #     await ctx.respond(
     #         "You will be initiating squid game for this guild\nPlease configure a settings below"
     #     )
 
     @mg_game.command()
-    @option(name="role", type=Role, description="Player's role who join the game")
+    @option(
+        name="role", type=discord.Role, description="Player's role who join the game"
+    )
     @option(
         name="segements",
         type=int,
@@ -98,19 +91,23 @@ class MinigamesCog(Cog):
         min_value=1,
     )
     async def glass_game(
-        self, ctx: ApplicationContext, role: Role, limit: int, segements: int
+        self,
+        ctx: discord.ApplicationContext,
+        role: discord.Role,
+        limit: int,
+        segements: int,
     ):
         players = [m async for m in ctx.guild.fetch_members() if m.get_role(role.id)]
         if not players:
             return await ctx.respond("No players were found on that role!")
-        detail_embed = Embed(
+        detail_embed = discord.Embed(
             colour=Colour.blurple(),
             title="Game details",
             description=(
                 f"**{len(players)} player(s) found!**\n"
                 + f"**TIME LIMIT IS: {limit} MINUTES!**\n"
                 + "Rules:\n"
-                + f"There will be {segements} bridge segments\n"
+                + f"There will be **{segements}** bridge segments\n"
                 + "Select the button bellow to reveal whether the bridge is safe or not\n"
                 + "If you fail the bridge, you will be eliminated directly\n"
                 + "If the time limit runs out, before segments reached "
@@ -124,16 +121,22 @@ class MinigamesCog(Cog):
             + ", ".join(f"({idx}. {m.mention})" for idx, m in enumerate(players, 1))
         )
         await asyncio.sleep(5)
-        settings = BridgeGameSettings(players.pop(0), 1, players, players)
+        settings = BridgeGameSettings(
+            players.pop(0), 1, segements, players, copy(players)
+        )
         view = BridgeGameView(self.bot, settings, limit * 60)
+        file, embed = settings.generate_image()
         view.msg = await ctx.followup.send(
-            f"GAME START!\n{GLASS_GAME_FORMATTER.format(settings.segment, settings.turn.mention)}",
+            f"GAME START!\n{settings.turn.mention}",
             view=view,
             wait=True,
-            file=settings.generate_image(),
+            file=file,
+            embed=embed,
         )
+        view.timeleft = await ctx.channel.send(f"Timeleft: {60*limit}s")
+        self.bot.loop.create_task(view.countdown())
 
     @slash_command()
-    @option(name="user", type=Member)
-    async def switch_turn(self, ctx: ApplicationContext, user: Member):
+    @option(name="user", type=discord.Member)
+    async def switch_turn(self, ctx: discord.ApplicationContext, user: discord.Member):
         await ctx.respond(f"{ctx.author.mention} Switched turn to {user.mention}")
