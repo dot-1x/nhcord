@@ -9,6 +9,7 @@ class NhCord(Bot):
         intent.members = True
         intent.guilds = True
         intent.message_content = True
+        intent.guild_messages = True
         super().__init__("NH New Era Custom Bot", intents=intent, *args, **options)
         self.log = BotLogger("[BOT]")
         self.load_extension(".cogs", package="bot", recursive=False, store=False)

@@ -1,1 +1,1 @@
-from .minigames_models import *
+from .bridge_game import *

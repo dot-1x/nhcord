@@ -1,15 +1,15 @@
 from __future__ import annotations
 import asyncio
-from copy import copy
 import json
+from copy import copy
 from random import shuffle
-
 from typing import TYPE_CHECKING, Dict, List
+
 import discord
-from discord import Colour, slash_command, option
+from discord import Colour, option
 from discord.ext.commands import Context
 
-from ..models.minigames.minigames_models import (
+from ..models.minigames import (
     RunningGame,
     BridgeGameView,
 )
@@ -67,17 +67,10 @@ class MinigamesCog(discord.Cog):
     async def on_message(self, msg: discord.Message):
         if msg.author.bot:
             return
+        print("hello world")
 
-    # @mg_game.command(description="Initiate Squidgame")
-    # async def start(self, ctx: discord.ApplicationContext):
-    #     await ctx.respond(
-    #         "You will be initiating squid game for this guild\nPlease configure a settings below"
-    #     )
-
-    @mg_game.command()
-    @option(
-        name="role", type=discord.Role, description="Player's role who join the game"
-    )
+    @mg_game.command(description="Squid game - glass game")
+    @option(name="role", type=discord.Role, description="Allowed Role to play the game")
     @option(
         name="segements",
         type=int,
@@ -90,12 +83,20 @@ class MinigamesCog(discord.Cog):
         description="Specify the time limit until the game is over (in minutes)",
         min_value=1,
     )
+    @option(
+        name="loser_role",
+        type=discord.Role,
+        description="Assigned role who lose the game",
+        required=False,
+        default=None,
+    )
     async def glass_game(
         self,
         ctx: discord.ApplicationContext,
         role: discord.Role,
         limit: int,
         segements: int,
+        loser_role: discord.Role | None = None,
     ):
         players = [m async for m in ctx.guild.fetch_members() if m.get_role(role.id)]
         if not players:
@@ -122,12 +123,12 @@ class MinigamesCog(discord.Cog):
         )
         await asyncio.sleep(5)
         settings = BridgeGameSettings(
-            players.pop(0), 1, segements, players, copy(players)
+            players.pop(0), segements, players, copy(players), loser_role=loser_role
         )
         view = BridgeGameView(self.bot, settings, limit * 60)
         file, embed = settings.generate_image()
         view.msg = await ctx.followup.send(
-            f"GAME START!\n{settings.turn.mention}",
+            f"GAME START!\n{settings.turn.mention}'s turn",
             view=view,
             wait=True,
             file=file,
@@ -136,7 +137,30 @@ class MinigamesCog(discord.Cog):
         view.timeleft = await ctx.channel.send(f"Timeleft: {60*limit}s")
         self.bot.loop.create_task(view.countdown())
 
-    @slash_command()
-    @option(name="user", type=discord.Member)
-    async def switch_turn(self, ctx: discord.ApplicationContext, user: discord.Member):
-        await ctx.respond(f"{ctx.author.mention} Switched turn to {user.mention}")
+    @mg_game.command(description="red green game based on questions")
+    @option(
+        name="quests",
+        type=discord.Attachment,
+        description="A file that contains questions format",
+    )
+    @option(name="role", type=discord.Role, description="Allowed Role to play the game")
+    @option(
+        name="loser_role",
+        type=discord.Role,
+        description="Assigned role who lose the game",
+        required=False,
+        default=None,
+    )
+    async def red_green(
+        self,
+        ctx: discord.ApplicationContext,
+        quests: discord.Attachment,
+        role: discord.Role,
+        loser_role: discord.Role,
+    ):
+        players = [m async for m in ctx.guild.fetch_members() if m.get_role(role.id)]
+        if not players:
+            return await ctx.respond("No players were found on that role!")
+        quest = json.loads(await quests.read())
+        await ctx.respond(f"{len(quest)} quest(s) found!")
+        print(loser_role)
