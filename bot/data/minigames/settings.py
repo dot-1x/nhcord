@@ -1,8 +1,14 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import Tuple, List
+from typing import TYPE_CHECKING, Dict, List
 from discord import Colour, Embed, Member, File, Role
 
 from ...utils.minigames import create_image_grid
+
+
+if TYPE_CHECKING:
+    from ...models.minigames import RGQuestion, RGPlayerData
 
 GLASS_GAME_FORMATTER = "Segments: {}\n{}'s turn!\nWhich bridge is SAFE?!!!"
 
@@ -12,15 +18,31 @@ If the time limit runs out, before segments reached\n\
 everyone in this stage gonna fail"
 
 
+@dataclass
+class BaseSettings:
+    channel_id: int
+    running: bool
+
+
 @dataclass(slots=True)
-class RedGreenGameSettings:
+class RedGreenGameSettings(BaseSettings):
+    questions: List[RGQuestion]
+    registered_player: Dict[int, RGPlayerData]
     allowed: bool = False
     fail_player: List[Member] = field(default_factory=list)
-    questions: List[Tuple[str, str]] = field(default_factory=list)
+    loser_role: Role | None = None
+    answer: str | None = None
+
+    def generate_quest(self):
+        quest = self.questions.pop()
+        self.answer = quest.answer
+        for _, player in self.registered_player.items():
+            player.answered = False
+        return quest.quest
 
 
 @dataclass(slots=True)
-class BridgeGameSettings:
+class BridgeGameSettings(BaseSettings):
     turn: Member
     segments: int
     players: List[Member]

@@ -1,7 +1,5 @@
 from __future__ import annotations
 import asyncio
-from dataclasses import dataclass
-from enum import Enum, auto
 
 from typing import TYPE_CHECKING, Optional, Sequence
 from discord import (
@@ -19,16 +17,7 @@ from discord.ui import View, Button
 if TYPE_CHECKING:
     from ...data.minigames import BridgeGameSettings
 
-
-class GameType(Enum):
-    GLASS_BRIDGE = auto()
-    RED_GREEN = auto()
-
-
-@dataclass
-class RunningGame:
-    running: bool
-    games: Optional[GameType]
+__all__ = ("BridgeGameView",)
 
 
 class BridgeGameButton(Button["BridgeGameView"]):
@@ -106,7 +95,15 @@ class BridgeGameView(View):
             return await interaction.response.send_message(
                 "You cannot perform this action", ephemeral=True
             )
-        await self.switch_turn()
+        try:
+            await self.switch_turn()
+            await interaction.response.send_message(
+                f"Switched turn to {self.settings.turn}", ephemeral=True
+            )
+        except ValueError:
+            await interaction.response.send_message(
+                "No more players to switch", ephemeral=True
+            )
 
     async def edit_msg(self, content: str, generate: bool, **kwargs):
         if not self.msg:
@@ -150,6 +147,7 @@ class BridgeGameView(View):
                 attachments=[],
                 view=self,
             )
+            self.settings.running = False
 
     async def countdown(self):
         while not self.timeleft:
@@ -170,3 +168,4 @@ class BridgeGameView(View):
             await self.msg.edit(
                 content="TIMES UP!!\nNo one has manage to escape!", view=self
             )
+            self.settings.running = False
