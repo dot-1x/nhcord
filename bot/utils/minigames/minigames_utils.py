@@ -4,9 +4,11 @@ from PIL import Image, ImageFilter
 
 def create_image_grid():
     broken = Image.open("bot/glass_broken.jpg")
-    broken_blurry = broken.filter(ImageFilter.GaussianBlur(100))
+    broken = broken.resize((160, 120))
+    broken_blurry = broken.filter(ImageFilter.BoxBlur(4))
     safe = Image.open("bot/glass_safe.jpg")
-    safe_blurry = safe.filter(ImageFilter.GaussianBlur(100))
+    safe = safe.resize((160, 120))
+    safe_blurry = safe.filter(ImageFilter.BoxBlur(4))
     rows = 2
     cols = 2
     width, height = broken_blurry.size

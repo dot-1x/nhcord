@@ -127,10 +127,20 @@ class BridgeGameView(View):
             self.disabled = True
             await self.timeleft.delete()
             fields = [
-                EmbedField(name, str(val))
-                for name, val in [
-                    ("Player Alive", len(self.settings.players) + 1),
-                    ("Player Failed", len(self.settings.fail_player)),
+                EmbedField(name, str(val), inline)
+                for name, val, inline in [
+                    ("Player Alive", len(self.settings.players), True),
+                    ("Player Failed", len(self.settings.fail_player), True),
+                    (
+                        "Players Alive",
+                        "\n".join(player.mention for player in self.settings.players),
+                        False,
+                    ),
+                    (
+                        "Players Failed",
+                        "\n".join(player.mention for player in self.settings.fail_player),
+                        False,
+                    ),
                 ]
             ]
             self.disable_all_items()

@@ -56,9 +56,10 @@ class RGGameBase:
 
     async def timer(self):
         while self.limit > 0:
+            if not self.enabled:
+                return
             self.limit -= 1
             await asyncio.sleep(1)
-        self.enabled = False
         await self.done()
 
     async def start_game(self):
@@ -75,6 +76,7 @@ class RGGameBase:
         await self.done()
 
     async def done(self):
+        self.enabled = False
         passed_players: list[Member] = []
         fails = self.settings.fail_player
         while self.settings.registered_player:
