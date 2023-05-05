@@ -94,13 +94,10 @@ class BridgeGameView(View):
             return await interaction.response.send_message(
                 "You cannot perform this action", ephemeral=True
             )
-        try:
-            await self.switch_turn()
-            await interaction.response.send_message(
-                f"Switched turn to {self.settings.turn}", ephemeral=True
-            )
-        except ValueError:
-            await interaction.response.send_message("No more players to switch", ephemeral=True)
+        await self.switch_turn()
+        await interaction.response.send_message(
+            f"Switched turn to {self.settings.turn}", ephemeral=True
+        )
 
     async def edit_msg(self, content: str, generate: bool, **kwargs):
         if not self.msg:
@@ -116,7 +113,10 @@ class BridgeGameView(View):
 
     async def switch_turn(self):
         self.settings.fail_player.append(self.settings.turn)
-        self.settings.new_turn()
+        try:
+            self.settings.new_turn()
+        except ValueError:
+            return await self.done()
         await self.edit_msg(f"{self.settings.turn.mention}'s turn", False)
 
     async def refresh_message(self):
@@ -137,7 +137,7 @@ class BridgeGameView(View):
             emb = Embed(title="Final Stats", fields=fields, colour=Colour.teal())
             emb.set_thumbnail(url=THUMBNAIL_URL)
             await self.msg.edit(
-                "Congratulations!!! you have passed the game!",
+                "GAME OVER!!!",
                 embed=emb,
                 attachments=[],
                 view=self,

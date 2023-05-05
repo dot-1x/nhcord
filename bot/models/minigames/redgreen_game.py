@@ -28,11 +28,12 @@ class RGPlayerData:
     afk_counter: datetime | None = field(default=datetime.now())
 
     def valid_turn(self):
-        if self.afk_counter and (self.afk_counter - datetime.now()) > timedelta(minutes=20):
+        if self.afk_counter and (datetime.now() - self.afk_counter) > timedelta(minutes=20):
             return False
         if self.answered:
             return False
-        if self.last_wrong and (self.last_wrong - datetime.now()) < timedelta(minutes=5):
+        if self.last_wrong and (datetime.now() - self.last_wrong) < timedelta(minutes=5):
+            print(f"{self.author} is on wrong cooldown!")
             return False
         return True
 
@@ -58,6 +59,7 @@ class RGGameBase:
             self.limit -= 1
             await asyncio.sleep(1)
         self.enabled = False
+        await self.done()
 
     async def start_game(self):
         asyncio.get_running_loop().create_task(self.timer())
@@ -70,6 +72,7 @@ class RGGameBase:
             await self.channel.send(":red_circle: :red_circle: :red_circle:")
             self.settings.allowed = False
             await asyncio.sleep(randint(self.timing_min, self.timing_max))
+        await self.done()
 
     async def done(self):
         passed_players: list[Member] = []

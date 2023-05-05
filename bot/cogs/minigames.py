@@ -79,13 +79,13 @@ class MinigamesCog(discord.Cog):
             if not settings.answer or not msg.author.id in settings.registered_player:
                 return
             player = settings.registered_player[msg.author.id]
+            player.afk_counter = None  # remove the afk from player
             if player.correct > 4:
                 return
             if not settings.allowed:
                 return settings.eliminate_player(msg.author)
             if not player.valid_turn():
                 return
-            player.afk_counter = None  # remove the afk from player
             if msg.content.lower() == settings.answer.lower():
                 player.answered = True
                 player.correct += 1
