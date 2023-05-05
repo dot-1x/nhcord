@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Dict, List
-from discord import Colour, Embed, Member, File, Role
+from discord import Colour, Embed, Member, File, Role, User
 
 from ...utils.minigames import create_image_grid
 
@@ -42,7 +42,7 @@ class RedGreenGameSettings(BaseSettings):
             await asyncio.sleep(0)
         return quest.quest
 
-    def eliminate_player(self, player: Member):
+    def eliminate_player(self, player: Member | User):
         elim = self.registered_player.pop(player.id)
         self.fail_player.append(elim.author)
         print(f"{elim.author} eliminated!")
