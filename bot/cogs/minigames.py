@@ -30,25 +30,19 @@ class MinigamesCog(discord.Cog):
 
     def __init__(self, bot: NhCord) -> None:
         self.bot = bot
-        with open(
-            "bot/data/minigames/minigames_settings.json", "r", encoding="utf-8"
-        ) as settings:
+        with open("bot/data/minigames/minigames_settings.json", "r", encoding="utf-8") as settings:
             setting = json.load(settings)
             self.authorized: List[int] = setting["auth_command"]
         self.running_game: Dict[int, RunningGame] = {}
         self.rg_game: Dict[int, RedGreenGameSettings] = {}
 
-    async def handle_err_message(
-        self, ctx: discord.ApplicationContext | Context, message: str
-    ):
+    async def handle_err_message(self, ctx: discord.ApplicationContext | Context, message: str):
         if isinstance(ctx, discord.ApplicationContext):
             await ctx.response.send_message(message, ephemeral=True)
         else:
             await ctx.reply(message)
 
-    async def cog_command_error(
-        self, ctx: discord.ApplicationContext, error: Exception
-    ) -> None:
+    async def cog_command_error(self, ctx: discord.ApplicationContext, error: Exception) -> None:
         if isinstance(error, discord.CheckFailure):
             self.bot.log.warning(f"Check failed invoked by {ctx.author}")
         else:
@@ -71,9 +65,7 @@ class MinigamesCog(discord.Cog):
             and self.running_game[channel_id].settings.running
             and cmd_name != "stop_game"
         ):
-            self.bot.loop.create_task(
-                self.handle_err_message(ctx, "Another game is running!")
-            )
+            self.bot.loop.create_task(self.handle_err_message(ctx, "Another game is running!"))
             return False
         return True
 
@@ -93,7 +85,7 @@ class MinigamesCog(discord.Cog):
                 return settings.eliminate_player(msg.author)
             if not player.valid_turn():
                 return
-            player.afk_counter = None # remove the afk from player
+            player.afk_counter = None  # remove the afk from player
             if msg.content.lower() == settings.answer.lower():
                 player.answered = True
                 player.correct += 1
@@ -102,9 +94,12 @@ class MinigamesCog(discord.Cog):
                 player.last_wrong = datetime.now()
                 print(f"{msg.author} answered wrong")
 
-
     @mg_game.command(description="Squid game - glass game")
-    @option(name="role", type=discord.Role, description="Allowed Role to play the game")
+    @option(
+        name="role",
+        type=discord.Role,
+        description="Allowed Role to play the game",
+    )
     @option(
         name="segements",
         type=int,
@@ -186,7 +181,11 @@ class MinigamesCog(discord.Cog):
         type=discord.Attachment,
         description="A file that contains questions format",
     )
-    @option(name="role", type=discord.Role, description="Allowed Role to play the game")
+    @option(
+        name="role",
+        type=discord.Role,
+        description="Allowed Role to play the game",
+    )
     @option(
         name="limit",
         type=int,

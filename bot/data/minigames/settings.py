@@ -41,7 +41,7 @@ class RedGreenGameSettings(BaseSettings):
             player.answered = False
             await asyncio.sleep(0)
         return quest.quest
-    
+
     def eliminate_player(self, player: Member):
         elim = self.registered_player.pop(player.id)
         self.fail_player.append(elim.author)

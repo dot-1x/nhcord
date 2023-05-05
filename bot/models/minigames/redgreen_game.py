@@ -89,14 +89,16 @@ class RGGameBase:
                     str(len(passed_players)),
                     inline=True,
                 ),
+                discord.EmbedField("Total Fail Player", str(len(fails)), inline=True),
                 discord.EmbedField(
-                    "Total Fail Player", str(len(fails)), inline=True
+                    "Passed Players",
+                    "\n".join(player.mention for player in passed_players),
+                    inline=False,
                 ),
                 discord.EmbedField(
-                    "Passed Players", "\n".join(player.mention for player in passed_players), inline=False
-                ),
-                discord.EmbedField(
-                    "Fail Players", "\n".join(player.mention for player in fails), inline=True
+                    "Fail Players",
+                    "\n".join(player.mention for player in fails),
+                    inline=True,
                 ),
             ],
             colour=discord.Colour.teal(),

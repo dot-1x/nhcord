@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from ...data.minigames import BridgeGameSettings
 
 __all__ = ("BridgeGameView",)
+THUMBNAIL_URL = "https://www.vsomglass.com/wp-content/uploads/2021/10/SQUID-GAME-GLASS-BRIDGE-1.jpg"
 
 
 class BridgeGameButton(Button["BridgeGameView"]):
@@ -30,9 +31,7 @@ class BridgeGameButton(Button["BridgeGameView"]):
         **kwargs,
     ):
         super().__init__(
-            style=ButtonStyle.primary
-            if not kwargs.get("disabled")
-            else ButtonStyle.gray,
+            style=ButtonStyle.primary if not kwargs.get("disabled") else ButtonStyle.gray,
             label=label,
             custom_id=custom_id,
             row=row,
@@ -101,9 +100,7 @@ class BridgeGameView(View):
                 f"Switched turn to {self.settings.turn}", ephemeral=True
             )
         except ValueError:
-            await interaction.response.send_message(
-                "No more players to switch", ephemeral=True
-            )
+            await interaction.response.send_message("No more players to switch", ephemeral=True)
 
     async def edit_msg(self, content: str, generate: bool, **kwargs):
         if not self.msg:
@@ -138,9 +135,7 @@ class BridgeGameView(View):
             ]
             self.disable_all_items()
             emb = Embed(title="Final Stats", fields=fields, colour=Colour.teal())
-            emb.set_thumbnail(
-                url="https://www.vsomglass.com/wp-content/uploads/2021/10/SQUID-GAME-GLASS-BRIDGE-1.jpg"
-            )
+            emb.set_thumbnail(url=THUMBNAIL_URL)
             await self.msg.edit(
                 "Congratulations!!! you have passed the game!",
                 embed=emb,
@@ -165,7 +160,5 @@ class BridgeGameView(View):
             self.disabled = True
             self.disable_all_items()
             await self.timeleft.delete()
-            await self.msg.edit(
-                content="TIMES UP!!\nNo one has manage to escape!", view=self
-            )
+            await self.msg.edit(content="TIMES UP!!\nNo one has manage to escape!", view=self)
             self.settings.running = False
