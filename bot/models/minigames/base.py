@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
-from ...data.minigames.settings import BridgeGameSettings, RedGreenGameSettings
+
+if TYPE_CHECKING:
+    from ...data.minigames import BridgeGameSettings, RedGreenGameSettings
 
 __all__ = ("RunningGame", "GameType")
 

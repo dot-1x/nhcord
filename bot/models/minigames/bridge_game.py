@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from ...data.minigames import BridgeGameSettings
 
 __all__ = ("BridgeGameView",)
+THUMBNAIL_URL = "https://www.vsomglass.com/wp-content/uploads/2021/10/SQUID-GAME-GLASS-BRIDGE-1.jpg"
 
 
 class BridgeGameButton(Button["BridgeGameView"]):
@@ -30,9 +31,7 @@ class BridgeGameButton(Button["BridgeGameView"]):
         **kwargs,
     ):
         super().__init__(
-            style=ButtonStyle.primary
-            if not kwargs.get("disabled")
-            else ButtonStyle.gray,
+            style=ButtonStyle.primary if not kwargs.get("disabled") else ButtonStyle.gray,
             label=label,
             custom_id=custom_id,
             row=row,
@@ -95,15 +94,10 @@ class BridgeGameView(View):
             return await interaction.response.send_message(
                 "You cannot perform this action", ephemeral=True
             )
-        try:
-            await self.switch_turn()
-            await interaction.response.send_message(
-                f"Switched turn to {self.settings.turn}", ephemeral=True
-            )
-        except ValueError:
-            await interaction.response.send_message(
-                "No more players to switch", ephemeral=True
-            )
+        await self.switch_turn()
+        await interaction.response.send_message(
+            f"Switched turn to {self.settings.turn}", ephemeral=True
+        )
 
     async def edit_msg(self, content: str, generate: bool, **kwargs):
         if not self.msg:
@@ -119,7 +113,10 @@ class BridgeGameView(View):
 
     async def switch_turn(self):
         self.settings.fail_player.append(self.settings.turn)
-        self.settings.new_turn()
+        try:
+            self.settings.new_turn()
+        except ValueError:
+            return await self.done()
         await self.edit_msg(f"{self.settings.turn.mention}'s turn", False)
 
     async def refresh_message(self):
@@ -130,19 +127,27 @@ class BridgeGameView(View):
             self.disabled = True
             await self.timeleft.delete()
             fields = [
-                EmbedField(name, str(val))
-                for name, val in [
-                    ("Player Alive", len(self.settings.players) + 1),
-                    ("Player Failed", len(self.settings.fail_player)),
+                EmbedField(name, str(val), inline)
+                for name, val, inline in [
+                    ("Player Alive", len(self.settings.players), True),
+                    ("Player Failed", len(self.settings.fail_player), True),
+                    (
+                        "Players Alive",
+                        "\n".join(player.mention for player in self.settings.players),
+                        False,
+                    ),
+                    (
+                        "Players Failed",
+                        "\n".join(player.mention for player in self.settings.fail_player),
+                        False,
+                    ),
                 ]
             ]
             self.disable_all_items()
             emb = Embed(title="Final Stats", fields=fields, colour=Colour.teal())
-            emb.set_thumbnail(
-                url="https://www.vsomglass.com/wp-content/uploads/2021/10/SQUID-GAME-GLASS-BRIDGE-1.jpg"
-            )
+            emb.set_thumbnail(url=THUMBNAIL_URL)
             await self.msg.edit(
-                "Congratulations!!! you have passed the game!",
+                "GAME OVER!!!",
                 embed=emb,
                 attachments=[],
                 view=self,
@@ -165,7 +170,5 @@ class BridgeGameView(View):
             self.disabled = True
             self.disable_all_items()
             await self.timeleft.delete()
-            await self.msg.edit(
-                content="TIMES UP!!\nNo one has manage to escape!", view=self
-            )
+            await self.msg.edit(content="TIMES UP!!\nNo one has manage to escape!", view=self)
             self.settings.running = False

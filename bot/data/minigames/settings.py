@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Dict, List
 from discord import Colour, Embed, Member, File, Role
@@ -33,12 +34,18 @@ class RedGreenGameSettings(BaseSettings):
     loser_role: Role | None = None
     answer: str | None = None
 
-    def generate_quest(self):
+    async def generate_quest(self):
         quest = self.questions.pop()
         self.answer = quest.answer
         for _, player in self.registered_player.items():
             player.answered = False
+            await asyncio.sleep(0)
         return quest.quest
+
+    def eliminate_player(self, player: Member):
+        elim = self.registered_player.pop(player.id)
+        self.fail_player.append(elim.author)
+        print(f"{elim.author} eliminated!")
 
 
 @dataclass(slots=True)
