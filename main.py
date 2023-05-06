@@ -1,7 +1,6 @@
 import os
 
 import httpx
-from PIL import Image
 from dotenv import load_dotenv
 from bot import NhCord
 
