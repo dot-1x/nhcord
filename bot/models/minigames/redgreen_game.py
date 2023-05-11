@@ -27,12 +27,19 @@ class RGPlayerData:
     last_wrong: datetime | None = None
     afk_counter: datetime | None = field(default=datetime.now())
 
+    def is_afk(self):
+        if self.afk_counter and (datetime.now() - self.afk_counter) > timedelta(
+            minutes=20
+        ):
+            return True
+        return False
+
     def valid_turn(self):
-        if self.afk_counter and (datetime.now() - self.afk_counter) > timedelta(minutes=20):
-            return False
         if self.answered:
             return False
-        if self.last_wrong and (datetime.now() - self.last_wrong) < timedelta(minutes=5):
+        if self.last_wrong and (datetime.now() - self.last_wrong) < timedelta(
+            minutes=5
+        ):
             print(f"{self.author} is on wrong cooldown!")
             return False
         return True
@@ -79,10 +86,11 @@ class RGGameBase:
         self.enabled = False
         passed_players: list[Member] = []
         fails = self.settings.fail_player
+        loser_role = self.settings.loser_role
         while self.settings.registered_player:
             _, player = self.settings.registered_player.popitem()
             if player.correct > 4:
-                passed_players.append(player)
+                passed_players.append(player.author)
             else:
                 fails.append(player.author)
             await asyncio.sleep(0)
@@ -109,3 +117,8 @@ class RGGameBase:
             colour=discord.Colour.teal(),
         )
         await self.channel.send("Game OVER!", embed=embed)
+        if loser_role:
+            for fail in fails:
+                await fail.add_roles(
+                    loser_role, reason="Losing the game"  # type: ignore
+                )

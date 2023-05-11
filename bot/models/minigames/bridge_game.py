@@ -18,7 +18,9 @@ if TYPE_CHECKING:
     from ...data.minigames import BridgeGameSettings
 
 __all__ = ("BridgeGameView",)
-THUMBNAIL_URL = "https://www.vsomglass.com/wp-content/uploads/2021/10/SQUID-GAME-GLASS-BRIDGE-1.jpg"
+THUMBNAIL_URL = (
+    "https://www.vsomglass.com/wp-content/uploads/2021/10/SQUID-GAME-GLASS-BRIDGE-1.jpg"
+)
 
 
 class BridgeGameButton(Button["BridgeGameView"]):
@@ -31,7 +33,9 @@ class BridgeGameButton(Button["BridgeGameView"]):
         **kwargs,
     ):
         super().__init__(
-            style=ButtonStyle.primary if not kwargs.get("disabled") else ButtonStyle.gray,
+            style=ButtonStyle.primary
+            if not kwargs.get("disabled")
+            else ButtonStyle.gray,
             label=label,
             custom_id=custom_id,
             row=row,
@@ -124,21 +128,24 @@ class BridgeGameView(View):
 
     async def done(self):
         if self.msg and self.timeleft:
+            fails = self.settings.fail_player
+            players = self.settings.players
+            loser_role = self.settings.loser_role
             self.disabled = True
             await self.timeleft.delete()
             fields = [
                 EmbedField(name, str(val), inline)
                 for name, val, inline in [
-                    ("Player Alive", len(self.settings.players), True),
-                    ("Player Failed", len(self.settings.fail_player), True),
+                    ("Player Alive", len(players), True),
+                    ("Player Failed", len(fails), True),
                     (
                         "Players Alive",
-                        "\n".join(player.mention for player in self.settings.players),
+                        "\n".join(player.mention for player in players),
                         False,
                     ),
                     (
                         "Players Failed",
-                        "\n".join(player.mention for player in self.settings.fail_player),
+                        "\n".join(player.mention for player in fails),
                         False,
                     ),
                 ]
@@ -153,6 +160,9 @@ class BridgeGameView(View):
                 view=self,
             )
             self.settings.running = False
+            if loser_role:
+                for fail in fails:
+                    await fail.add_roles(loser_role, reason="Losing the game")  # type: ignore
 
     async def countdown(self):
         while not self.timeleft:
@@ -170,5 +180,7 @@ class BridgeGameView(View):
             self.disabled = True
             self.disable_all_items()
             await self.timeleft.delete()
-            await self.msg.edit(content="TIMES UP!!\nNo one has manage to escape!", view=self)
+            await self.msg.edit(
+                content="TIMES UP!!\nNo one has manage to escape!", view=self
+            )
             self.settings.running = False

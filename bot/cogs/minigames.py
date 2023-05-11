@@ -30,26 +30,39 @@ class MinigamesCog(discord.Cog):
 
     def __init__(self, bot: NhCord) -> None:
         self.bot = bot
-        with open("bot/data/minigames/minigames_settings.json", "r", encoding="utf-8") as settings:
+        with open(
+            "bot/data/minigames/minigames_settings.json", "r", encoding="utf-8"
+        ) as settings:
             setting = json.load(settings)
             self.authorized: List[int] = setting["auth_command"]
         self.running_game: Dict[int, RunningGame] = {}
         self.rg_game: Dict[int, RedGreenGameSettings] = {}
 
-    async def handle_err_message(self, ctx: discord.ApplicationContext | Context, message: str):
+    async def handle_err_message(
+        self, ctx: discord.ApplicationContext | Context, message: str
+    ):
         if isinstance(ctx, discord.ApplicationContext):
             await ctx.response.send_message(message, ephemeral=True)
         else:
             await ctx.reply(message)
 
-    async def cog_command_error(self, ctx: discord.ApplicationContext, error: Exception) -> None:
+    async def cog_command_error(
+        self, ctx: discord.ApplicationContext, error: Exception
+    ) -> None:
         if isinstance(error, discord.CheckFailure):
             self.bot.log.warning(f"Check failed invoked by {ctx.author}")
         else:
             raise error
 
     def cog_check(self, ctx: discord.ApplicationContext | Context):
-        if ctx.author.id not in self.authorized:
+        if not any(
+            (
+                ctx.author.guild_permissions.manage_messages,
+                ctx.author.guild_permissions.manage_channels,
+                ctx.author.guild_permissions.manage_roles,
+                ctx.author.guild_permissions.manage_guild,
+            )
+        ):
             self.bot.loop.create_task(
                 self.handle_err_message(ctx, "You cannot perform this action")
             )
@@ -65,7 +78,9 @@ class MinigamesCog(discord.Cog):
             and self.running_game[channel_id].settings.running
             and cmd_name != "stop_game"
         ):
-            self.bot.loop.create_task(self.handle_err_message(ctx, "Another game is running!"))
+            self.bot.loop.create_task(
+                self.handle_err_message(ctx, "Another game is running!")
+            )
             return False
         return True
 
@@ -79,8 +94,11 @@ class MinigamesCog(discord.Cog):
             if not settings.answer or not msg.author.id in settings.registered_player:
                 return
             player = settings.registered_player[msg.author.id]
+            if player.is_afk():
+                print(f"Player {msg.author} is afk")
+                return
             player.afk_counter = None  # remove the afk from player
-            if player.correct > 4:
+            if player.correct >= settings.min_correct:
                 return
             if not settings.allowed:
                 return settings.eliminate_player(msg.author)
@@ -127,6 +145,8 @@ class MinigamesCog(discord.Cog):
         segements: int,
         loser_role: discord.Role | None = None,
     ):
+        if role == loser_role:
+            return await ctx.respond("Cannot assign same role for player and loser")
         players = [m async for m in ctx.guild.fetch_members() if m.get_role(role.id)]
         if not players:
             return await ctx.respond("No players were found on that role!")
@@ -191,12 +211,12 @@ class MinigamesCog(discord.Cog):
         type=int,
         min_value=1,
         default=5,
-        description="Set the times up limit (minutes)",
+        description="Set the times up limit (minutes) [5]",
     )
     @option(
         name="loser_role",
         type=discord.Role,
-        description="Assigned role who lose the game",
+        description="Assigned role who lose the game [None]",
         required=False,
         default=None,
     )
@@ -205,14 +225,21 @@ class MinigamesCog(discord.Cog):
         type=int,
         min_value=0,
         default=5,
-        description="Set the min time between the red-green light (seconds)",
+        description="Set the min time between the red-green light (seconds) [5]",
     )
     @option(
         name="timing_max",
         type=int,
         min_value=10,
         default=10,
-        description="Set the max time between the red-green light (seconds)",
+        description="Set the max time between the red-green light (seconds) [10]",
+    )
+    @option(
+        name="min_correct",
+        type=int,
+        min_value=1,
+        default=5,
+        description="Set the minimum total correct answer to win the game [5]",
     )
     async def red_green(
         self,
@@ -223,8 +250,11 @@ class MinigamesCog(discord.Cog):
         loser_role: discord.Role | None,
         timing_min: int,
         timing_max: int,
+        min_correct: int,
     ):
         await ctx.defer()
+        if role == loser_role:
+            return await ctx.respond("Cannot assign same role for player and loser")
         if timing_max == timing_min:
             return await ctx.respond("The time between game cannot be same")
         if timing_min > timing_max:
@@ -237,7 +267,16 @@ class MinigamesCog(discord.Cog):
         }
         if not players:
             return await ctx.respond("No players were found on that role!")
-        quest = [RGQuestion(q["q"], q["a"]) for q in json.loads(await quests.read())]
+        try:
+            quest = [
+                RGQuestion(q["q"], q["a"]) for q in json.loads(await quests.read())
+            ]
+        except (KeyError, json.JSONDecodeError):
+            with open("data/example.json", "rb") as exp:
+                prettify = json.dumps(json.load(exp), indent=4)
+            return await ctx.respond(
+                f"Please use the following format:\n```json\n{prettify}```"
+            )
         emb = discord.Embed(
             title="Game Details",
             description="There will be some questions appear on the chat"
@@ -251,6 +290,7 @@ class MinigamesCog(discord.Cog):
                 discord.EmbedField("Timing", f"{timing_min}s - {timing_max}s"),
                 discord.EmbedField("Quests", f"{len(quest)} quest(s)"),
                 discord.EmbedField("Loser role", str(loser_role)),
+                discord.EmbedField("Minimum correct", str(min_correct)),
             ],
             colour=discord.Colour.blurple(),
         )
@@ -261,6 +301,7 @@ class MinigamesCog(discord.Cog):
             running=True,
             questions=quest,
             loser_role=loser_role,
+            min_correct=min_correct,
         )
         self.rg_game.update({ctx.channel_id or 0: settings})
         game = RGGameBase(settings, timing_max, timing_min, limit * 60, ctx.channel)

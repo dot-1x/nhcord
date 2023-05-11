@@ -33,6 +33,7 @@ class RedGreenGameSettings(BaseSettings):
     fail_player: List[Member] = field(default_factory=list)
     loser_role: Role | None = None
     answer: str | None = None
+    min_correct: int = 5
 
     async def generate_quest(self):
         quest = self.questions.pop()

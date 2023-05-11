@@ -1,4 +1,5 @@
 from __future__ import annotations
+from abc import ABC
 
 from dataclasses import dataclass
 from enum import Enum, auto
@@ -23,3 +24,7 @@ class GameType(Enum):
 class RunningGame:
     games: Optional[GameType]
     settings: BridgeGameSettings | RedGreenGameSettings
+
+
+class ABCMiniGames(ABC):
+    ...
