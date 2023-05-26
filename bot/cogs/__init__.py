@@ -1,12 +1,13 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
-from .minigames import *
+from .minigames import MinigamesCog
+from .giveaway import GiveawayCog
 
 if TYPE_CHECKING:
     from ..bot import NhCord
 
-COGS = [MinigamesCog]
+COGS = [GiveawayCog, MinigamesCog]
 
 
 def setup(bot: NhCord):

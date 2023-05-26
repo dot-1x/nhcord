@@ -67,6 +67,20 @@ class MinigamesCog(discord.Cog):
                 self.handle_err_message(ctx, "You cannot perform this action")
             )
             return False
+        if isinstance(ctx, discord.ApplicationContext):
+            opts = ctx.selected_options
+            if (
+                opts
+                and any(opt for opt in opts if opt.get("name") == "loser_role")
+                and not ctx.guild.me.guild_permissions.manage_roles
+            ):
+                self.bot.loop.create_task(
+                    self.handle_err_message(
+                        ctx, "Bot needs a permission to change role!"
+                    )
+                )
+                return False
+
         channel_id = (
             ctx.interaction.channel_id
             if isinstance(ctx, discord.ApplicationContext)
@@ -145,8 +159,11 @@ class MinigamesCog(discord.Cog):
         segements: int,
         loser_role: discord.Role | None = None,
     ):
+        await ctx.defer()
         if role == loser_role:
-            return await ctx.respond("Cannot assign same role for player and loser")
+            return await ctx.respond(
+                "Cannot assign same role for player and loser", ephemeral=True
+            )
         players = [m async for m in ctx.guild.fetch_members() if m.get_role(role.id)]
         if not players:
             return await ctx.respond("No players were found on that role!")
@@ -182,7 +199,7 @@ class MinigamesCog(discord.Cog):
             loser_role=loser_role,
             running=True,
         )
-        view = BridgeGameView(self.bot, settings, limit * 60)
+        view = BridgeGameView(self.bot, settings, ctx.author, limit * 60)
         file, embed = settings.generate_image()
         await asyncio.sleep(5)
         view.msg = await ctx.followup.send(
@@ -254,11 +271,17 @@ class MinigamesCog(discord.Cog):
     ):
         await ctx.defer()
         if role == loser_role:
-            return await ctx.respond("Cannot assign same role for player and loser")
+            return await ctx.respond(
+                "Cannot assign same role for player and loser", ephemeral=True
+            )
         if timing_max == timing_min:
-            return await ctx.respond("The time between game cannot be same")
+            return await ctx.respond(
+                "The time between game cannot be same", ephemeral=True
+            )
         if timing_min > timing_max:
-            return await ctx.respond("The minimum time cannot be higher than max time")
+            return await ctx.respond(
+                "The minimum time cannot be higher than max time", ephemeral=True
+            )
 
         players = {
             m.id: RGPlayerData(m)

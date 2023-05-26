@@ -8,7 +8,9 @@ from discord import (
     Colour,
     EmbedField,
     Interaction,
+    Member,
     Message,
+    User,
     WebhookMessage,
     Embed,
 )
@@ -63,6 +65,7 @@ class BridgeGameView(View):
         self,
         bot: Bot,
         settings: BridgeGameSettings,
+        invoker: User | Member,
         timeout: float = 60,
     ):
         if timeout <= 0:
@@ -74,6 +77,7 @@ class BridgeGameView(View):
         self.settings = settings
         self.bot = bot
         self.disabled = False
+        self.invoker = invoker
         idx = 1
         for row in range(1, 3):
             for col in range(1, 4):
@@ -94,7 +98,7 @@ class BridgeGameView(View):
         self.add_item(switch_btn)
 
     async def check_switch(self, interaction: Interaction):
-        if interaction.user and interaction.user.id not in [732842920889286687]:
+        if interaction.user and interaction.user != self.invoker:
             return await interaction.response.send_message(
                 "You cannot perform this action", ephemeral=True
             )
@@ -130,6 +134,8 @@ class BridgeGameView(View):
         if self.msg and self.timeleft:
             fails = self.settings.fail_player
             players = self.settings.players
+            if self.settings.turn not in fails:
+                players.append(self.settings.turn)
             loser_role = self.settings.loser_role
             self.disabled = True
             await self.timeleft.delete()
