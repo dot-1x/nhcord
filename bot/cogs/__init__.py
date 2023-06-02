@@ -3,11 +3,12 @@ from typing import TYPE_CHECKING
 
 from .minigames import MinigamesCog
 from .giveaway import GiveawayCog
+from .misc import MiscCog
 
 if TYPE_CHECKING:
     from ..bot import NhCord
 
-COGS = [GiveawayCog, MinigamesCog]
+COGS = [MiscCog, GiveawayCog, MinigamesCog]
 
 
 def setup(bot: NhCord):

@@ -18,6 +18,7 @@ from ..models.minigames import (
     RGQuestion,
 )
 from ..data.minigames import BridgeGameSettings, RedGreenGameSettings
+from ..utils.minigames import get_member_by_role
 
 if TYPE_CHECKING:
     from ..bot import NhCord
@@ -164,7 +165,9 @@ class MinigamesCog(discord.Cog):
             return await ctx.respond(
                 "Cannot assign same role for player and loser", ephemeral=True
             )
-        players = [m async for m in ctx.guild.fetch_members() if m.get_role(role.id)]
+        players = [
+            member async for member in get_member_by_role(ctx.guild, role, loser_role)
+        ]
         if not players:
             return await ctx.respond("No players were found on that role!")
         detail_embed = discord.Embed(
@@ -258,7 +261,7 @@ class MinigamesCog(discord.Cog):
         default=5,
         description="Set the minimum total correct answer to win the game [5]",
     )
-    async def red_green(
+    async def red_green(  # pylint: disable=too-many-locals
         self,
         ctx: discord.ApplicationContext,
         quests: discord.Attachment,

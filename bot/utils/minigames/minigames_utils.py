@@ -1,5 +1,6 @@
 from random import shuffle
 from PIL import Image, ImageFilter
+from discord import Guild, Role
 
 
 def create_image_grid():
@@ -21,3 +22,23 @@ def create_image_grid():
         if img is safe_blurry:
             safe_point = i
     return grid, safe_point
+
+
+async def get_member_by_role(guild: Guild, role: Role, role_except: Role | None):
+    """Fetch all members then check they have one of required roles and exception role
+
+    Args:
+        guild (Guild): guild members to check
+        roles Role: required roles
+        roles_except Role | None: exception role
+
+    Yields:
+        discord.Member: founded member
+    """
+    async for member in guild.fetch_members():
+        if (
+            member.get_role(role.id)
+            and (not member.get_role(role_except.id) if role_except else True)
+            and not member.bot
+        ):
+            yield member

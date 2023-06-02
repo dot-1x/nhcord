@@ -9,9 +9,12 @@ from discord import (
     Cog,
     option,
 )
+from discord.commands import ApplicationContext
 
 from discord.ui import View, button
 from discord.ext import commands
+
+from ..utils.check import is_admin
 
 if TYPE_CHECKING:
     from ..bot import NhCord
@@ -22,7 +25,7 @@ async def get_users_data(bot: NhCord, ids: list[int]):
     if not isinstance(channel, discord.TextChannel):
         raise ValueError("Text channel not found!")
     async for msg in channel.history(oldest_first=True, limit=None):
-        if msg.author.id in ids and msg.author:
+        if msg.author.id in ids:
             yield msg
 
 
@@ -44,6 +47,10 @@ class GiveawayView(View):
         self.max_winner = winners
         self.bot = bot
         self.deadline = deadline
+        self.reroll_select: discord.ui.Select[GiveawayView] = discord.ui.Select(
+            discord.ComponentType.string_select,
+            placeholder="Select user to reroll",
+        )
 
     @button(label="participate", style=discord.ButtonStyle.primary)
     async def participate(self, _, interaction: discord.Interaction):
@@ -67,67 +74,51 @@ class GiveawayView(View):
         )
         self.total_paarticipants += 1
 
-    @button(label="Reroll", style=discord.ButtonStyle.success)
+    @button(label="reroll", style=discord.ButtonStyle.success)
     async def reroll(self, _, interaction: discord.Interaction):
         if not interaction.user:
             return
         if not isinstance(interaction.channel, discord.TextChannel):
             return
-        perms = interaction.channel.permissions_for(interaction.user)  # type: ignore
-        if (
-            not perms.manage_channels
-            or not perms.manage_messages
-            or not perms.manage_guild
-        ):
-            return await interaction.response.send_message(
-                "This button is not for you!", ephemeral=True
-            )
+        # perms = interaction.channel.permissions_for(interaction.user)  # type: ignore
+        # if (
+        #     not perms.manage_channels
+        #     or not perms.manage_messages
+        #     or not perms.manage_guild
+        # ):
+        #     return await interaction.response.send_message(
+        #         "This button is not for you!", ephemeral=True
+        #     )
         if not self.ended:
             return await interaction.response.send_message(
                 "Giveaway is still running", ephemeral=True
             )
-        select: discord.ui.Select[GiveawayView] = discord.ui.Select(
-            discord.ComponentType.user_select,
-            placeholder="Select user to reroll",
-            options=[
-                discord.SelectOption(label=winner.name, value=str(winner.id))
-                for winner in self.winners
-            ],
+        self.reroll_select.options = [
+            discord.SelectOption(label=str(winner), value=str(winner.id))
+            for winner in self.winners
+        ]
+        self.reroll_select.callback = self.reroll_action  # type: ignore
+        view = View(self.reroll_select)
+        await interaction.response.send_message(
+            "select user to reroll", view=view, ephemeral=True
         )
-        select.callback = self.reroll_action  # type: ignore
-        view = View(select)
-        await interaction.response.send_message(view=view, ephemeral=True)
 
-    async def reroll_action(self, interaction: discord.Interaction):
-        await interaction.response.send_message("selected", ephemeral=True)
+    @button(label="participants: 0", style=discord.ButtonStyle.gray)
+    async def participant_btn(self, _, interaction: discord.Interaction):
+        if not interaction.user in self.participants:
+            return await interaction.response.send_message(
+                "You have not participated", ephemeral=True
+            )
+        await interaction.response.send_message(
+            f"You have participated among {self.total_paarticipants} participants",
+            ephemeral=True,
+        )
 
-    async def start_timer(self):
-        if not self.message:
-            raise ValueError("Message not found!")
-        self.bot.log.info("Starting giveaway timer!")
-        while datetime.now() < self.deadline:
-            await asyncio.sleep(1)
-        await self.roll()
-
-    async def roll(self):
+    async def get_winners(self):
         if not self.message:
             raise ValueError("Message not found!")
         self.ended = True
         embed = self.message.embeds[0]
-        if self.total_paarticipants < 1:
-            self.disable_all_items()
-            embed.description = "No participants"
-            return await self.message.edit(view=self, embed=embed)
-        for children in self.children:
-            if (
-                isinstance(children, discord.ui.Button)
-                and children.label == "participate"
-            ):
-                participate_btn = children
-                break
-        else:
-            return self.disable_all_items()
-        participate_btn.disabled = True
         shuffle(self.participants)
         winners = [
             self.participants.pop(randrange(len(self.participants)))
@@ -145,14 +136,76 @@ class GiveawayView(View):
         embed.description = "Winners:\n" + "\n".join(
             f"{winner.mention}: {winner_map[winner.id]}" for winner in winners
         )
-        self.winners = winners
-        print("Edited succesfully")
+        return winners, embed
+
+    async def reroll_action(self, interaction: discord.Interaction):
+        await interaction.response.send_message("selected", ephemeral=True)
+        print(self.reroll_select.values)
+
+    async def start_timer(self):
+        if not self.message:
+            raise ValueError("Message not found!")
+        asyncio.create_task(self.reload_participants())
+        self.bot.log.info("Starting giveaway timer!")
+        while datetime.now() < self.deadline:
+            await asyncio.sleep(1)
+        await self.roll()
+
+    async def reload_participants(self):
+        for children in self.children:
+            if (
+                isinstance(children, discord.ui.Button)
+                and children.label is not None
+                and "participants:" in children.label
+            ):
+                total_entries_btn = children
+                break
+        else:
+            return
+        while not self.ended:
+            total_entries_btn.label = f"Participants: {self.total_paarticipants}"
+            await self.message.edit(view=self)
+            await asyncio.sleep(10)
+
+    async def roll(self):
+        if not self.message:
+            raise ValueError("Message not found!")
+        self.ended = True
+        embed = self.message.embeds[0]
+        if self.total_paarticipants < 1:
+            self.disable_all_items()
+            embed.description = "No participants"
+            self.bot.log.warning("Giveaway ended with no participant")
+            return await self.message.edit(view=self, embed=embed)
+        for children in self.children:
+            if (
+                isinstance(children, discord.ui.Button)
+                and children.label == "participate"
+            ):
+                participate_btn = children
+                break
+        else:
+            return self.disable_all_items()
+        participate_btn.disabled = True
+
+        self.winners, embed = await self.get_winners()
         await self.message.edit(view=self, embed=embed)
+        mentions = ", ".join(winner.mention for winner in self.winners)
+        await self.message.reply(
+            f"Congratulations {mentions} you have won the Giveaway"
+        )
 
 
 class GiveawayCog(Cog):
     def __init__(self, bot: NhCord) -> None:
         self.bot = bot
+
+    def cog_check(self, ctx: ApplicationContext) -> bool:
+        if not isinstance(ctx.author, discord.Member):
+            return False
+        if not is_admin(ctx.author):
+            return False
+        return True
 
     @commands.slash_command()
     @option(name="name", type=str, description="Set giveaway name")
@@ -205,6 +258,7 @@ class GiveawayCog(Cog):
                 ),
                 discord.EmbedField(name="Timeleft", value=deadline_str, inline=True),
             ],
+            timestamp=datetime.now(),
         )
         view = GiveawayView(
             self.bot, winners, role, deltatime.total_seconds(), deadline
