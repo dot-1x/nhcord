@@ -1,5 +1,5 @@
 from __future__ import annotations
-import asyncio
+from datetime import datetime
 
 from typing import TYPE_CHECKING, Optional, Sequence
 from discord import (
@@ -10,11 +10,14 @@ from discord import (
     Interaction,
     Member,
     Message,
+    TextChannel,
     User,
     WebhookMessage,
     Embed,
 )
 from discord.ui import View, Button
+
+from ...utils.minigames.minigames_utils import TIMELEFT
 
 if TYPE_CHECKING:
     from ...data.minigames import BridgeGameSettings
@@ -52,12 +55,11 @@ class BridgeGameButton(Button["BridgeGameView"]):
                 "This button is not for you!", ephemeral=True
             )
         if self.view.settings.safe_point == int(self.custom_id or 1) - 1:
-            self.view.settings.segment += 1
             await interaction.response.send_message("You have success!", ephemeral=True)
-            await self.view.refresh_message()
+            await self.view.new_segment()
         else:
             await interaction.response.send_message("You have failed!", ephemeral=True)
-            await self.view.switch_turn()
+            await self.view.switch_turn(int(self.custom_id or 1) - 1)
 
 
 class BridgeGameView(View):
@@ -66,18 +68,20 @@ class BridgeGameView(View):
         bot: Bot,
         settings: BridgeGameSettings,
         invoker: User | Member,
-        timeout: float = 60,
+        channel: TextChannel,
+        timeout: datetime,
     ):
-        if timeout <= 0:
-            raise ValueError("Time out must be higher than 0")
-        super().__init__(timeout=timeout, disable_on_timeout=True)
+        super().__init__(
+            timeout=(timeout - datetime.now()).total_seconds(), disable_on_timeout=True
+        )
+        self.deadline = timeout
         self.childs: Sequence[BridgeGameButton] = []
-        self.msg: Optional[WebhookMessage] = None
-        self.timeleft: Message | None = None
+        self.msg: Optional[WebhookMessage | Message] = None
         self.settings = settings
         self.bot = bot
         self.disabled = False
         self.invoker = invoker
+        self.channel = channel
         idx = 1
         for row in range(1, 3):
             for col in range(1, 4):
@@ -90,93 +94,97 @@ class BridgeGameView(View):
                 if col % 2:
                     idx += 1
                 self.add_item(btn)
-                self.childs.append(btn)
+                if col % 2:
+                    self.childs.append(btn)
         switch_btn: Button["BridgeGameView"] = Button(
             style=ButtonStyle.success, label="Switch Turn", row=3
         )
         switch_btn.callback = self.check_switch  # type: ignore
+        self.childs.append(switch_btn)  # type: ignore
         self.add_item(switch_btn)
 
     async def check_switch(self, interaction: Interaction):
-        if interaction.user and interaction.user != self.invoker:
+        if interaction.user != self.invoker:
             return await interaction.response.send_message(
                 "You cannot perform this action", ephemeral=True
             )
-        await self.switch_turn()
+        await self.switch_turn(None)
         await interaction.response.send_message(
             f"Switched turn to {self.settings.turn}", ephemeral=True
         )
 
-    async def edit_msg(self, content: str, generate: bool, **kwargs):
+    async def new_segment(self):
         if not self.msg:
-            return None
-        self.msg.attachments = []
-        if generate:
-            if self.settings.segment > self.settings.segments:
-                return await self.done()
-            file, embed = self.settings.generate_image()
-            kwargs.update({"file": file})
-            kwargs.update({"embed": embed})
-        return await self.msg.edit(content=content, **kwargs)
-
-    async def switch_turn(self):
-        self.settings.fail_player.append(self.settings.turn)
-        try:
-            self.settings.new_turn()
-        except ValueError:
+            print("message were not found!")
+            return
+        self.disable_all_items()
+        file, embed = self.settings.generate_image(reveal=True)
+        await self.msg.edit(file=file, embed=embed, view=self)
+        self.settings.segment += 1
+        if self.settings.segment > self.settings.segments:
+            self.settings.segment = self.settings.segments
             return await self.done()
-        await self.edit_msg(f"{self.settings.turn.mention}'s turn", False)
+        # view = BridgeGameView(
+        #     self.bot, self.settings, self.invoker, self.channel, self.deadline
+        # )
+        for child in self.childs:
+            child.disabled = False
+        self.settings.move_segments()
+        file, embed = self.settings.generate_image()
+        self.msg = await self.channel.send(
+            content=TIMELEFT.format(time=round(self.deadline.timestamp()))
+            + f"{self.settings.turn.mention}'s turn",
+            file=file,
+            embed=embed,
+            view=self,
+        )
 
-    async def refresh_message(self):
-        await self.edit_msg(f"{self.settings.turn.mention}'s turn", True)
+    async def switch_turn(self, click_point: int | None):
+        if not self.msg:
+            print("message were not found!")
+            return
+        try:
+            await self.settings.new_turn(click_point)
+        except ValueError:
+            return await self.done(kill=True)
+        file, embed = self.settings.generate_image(reveal=False)
+        await self.msg.edit(file=file, embed=embed, view=self)
 
-    async def done(self):
-        if self.msg and self.timeleft:
+    async def done(self, kill=False):
+        if self.msg:
+            self.stop()
             fails = self.settings.fail_player
             players = self.settings.players
             if self.settings.turn not in fails:
                 players.append(self.settings.turn)
-            loser_role = self.settings.loser_role
             self.disabled = True
-            await self.timeleft.delete()
             fields = [
                 EmbedField(name, str(val), inline)
                 for name, val, inline in [
                     ("Player Alive", len(players), True),
                     ("Player Failed", len(fails), True),
+                    ("Last segment", self.settings.segment, True),
                 ]
             ]
             self.disable_all_items()
             emb = Embed(title="Final Stats", fields=fields, colour=Colour.teal())
             emb.set_thumbnail(url=THUMBNAIL_URL)
-            await self.msg.edit(
-                "GAME OVER!!!",
+            await self.msg.edit(view=self)
+            await self.msg.reply(
+                content=TIMELEFT.format(time=round(self.deadline.timestamp()))
+                + (
+                    "Congratulations!! you have won the game"
+                    if not kill
+                    else "Game Over!! everyone is failed"
+                ),
                 embed=emb,
-                attachments=[],
-                view=self,
             )
             self.settings.running = False
-            if loser_role:
-                for fail in fails:
-                    await fail.add_roles(loser_role, reason="Losing the game")  # type: ignore
-
-    async def countdown(self):
-        while not self.timeleft:
-            await asyncio.sleep(0)
-        for time in range(int(self.timeout or 1), 0, -1):
-            if self.disabled:
+            if kill:
+                await self.settings.assign_role("failed")
                 return
-            await self.timeleft.edit(content=f"Timeleft: {time}s")
-            await asyncio.sleep(1)
-        await self.on_timeout()
-        self.stop()
+            await self.settings.assign_role("winner")
+            await self.settings.assign_role("loser")
 
-    async def on_timeout(self) -> None:
-        if self.msg and not self.disabled and self.timeleft:
-            self.disabled = True
-            self.disable_all_items()
-            await self.timeleft.delete()
-            await self.msg.edit(
-                content="TIMES UP!!\nNo one has manage to escape!", view=self
-            )
-            self.settings.running = False
+    async def on_timeout(self):
+        await self.done(True)

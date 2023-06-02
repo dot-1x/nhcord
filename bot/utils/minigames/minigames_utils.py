@@ -1,27 +1,26 @@
-from random import shuffle
-from PIL import Image, ImageFilter
+from PIL import Image
 from discord import Guild, Role
 
+TIMELEFT = "Timeleft: <t:{time}:R>\n"
+WIDTH, HEIGHT = (160, 120)
+black = Image.new("RGB", (WIDTH, HEIGHT))
+broken = Image.open("bot/glass_broken.jpg").resize((WIDTH, HEIGHT))
+safe = Image.open("bot/glass_safe.jpg").resize((WIDTH, HEIGHT))
 
-def create_image_grid():
-    broken = Image.open("bot/glass_broken.jpg")
-    broken = broken.resize((160, 120))
-    broken_blurry = broken.filter(ImageFilter.BoxBlur(4))
-    safe = Image.open("bot/glass_safe.jpg")
-    safe = safe.resize((160, 120))
-    safe_blurry = safe.filter(ImageFilter.BoxBlur(4))
+
+def create_image_grid(revealed: list[int], safepos: int):
     rows = 2
     cols = 2
-    width, height = broken_blurry.size
-    grid = Image.new("RGB", size=(cols * width, rows * height))
-    images = [broken_blurry, broken_blurry, broken_blurry, safe_blurry]
-    shuffle(images)
-    safe_point = 0
-    for i, img in enumerate(images):
-        grid.paste(img, box=(i % cols * width, i // cols * height))
-        if img is safe_blurry:
-            safe_point = i
-    return grid, safe_point
+    grid = Image.new("RGB", size=(cols * WIDTH, rows * HEIGHT))
+    for idx in range(4):
+        if idx in revealed:
+            grid.paste(
+                broken if idx != safepos else safe,
+                box=(idx % cols * WIDTH, idx // cols * HEIGHT),
+            )
+            continue
+        grid.paste(black, box=(idx % cols * WIDTH, idx // cols * HEIGHT))
+    return grid
 
 
 async def get_member_by_role(guild: Guild, role: Role, role_except: Role | None):

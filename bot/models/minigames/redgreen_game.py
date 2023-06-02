@@ -9,8 +9,6 @@ from datetime import datetime, timedelta
 import discord
 from discord import Member
 
-from ...utils.check import is_admin
-
 if TYPE_CHECKING:
     from ...data.minigames import RedGreenGameSettings
     from bot.bot import NhCord
@@ -48,41 +46,6 @@ class RGPlayerData:
         return True
 
 
-class RGGameView(discord.ui.View):
-    def __init__(self, bot: NhCord, game: RGGameBase):
-        super().__init__(timeout=60 * 60, disable_on_timeout=True)
-        self.bot = bot
-        self.game = game
-
-    @discord.ui.button(label="Start Game", style=discord.ButtonStyle.primary)
-    async def start_game(self, _, interaction: discord.Interaction):
-        if isinstance(interaction.user, discord.Member) and not is_admin(
-            interaction.user
-        ):
-            return await interaction.response.send_message(
-                "This button is not for you", ephemeral=True
-            )
-        await self.disable()
-        await self.game.start_game()
-
-    @discord.ui.button(label="Cancel Game", style=discord.ButtonStyle.danger)
-    async def cancel_game(self, _, interaction: discord.Interaction):
-        if isinstance(interaction.user, discord.Member) and not is_admin(
-            interaction.user
-        ):
-            return await interaction.response.send_message(
-                "This button is not for you", ephemeral=True
-            )
-        await self.disable()
-        await self.game.start_game()
-
-    async def disable(self):
-        msg = self.message
-        if msg:
-            self.disable_all_items()
-            await msg.edit(view=self)
-
-
 class RGGameBase:
     def __init__(
         self,
@@ -98,33 +61,28 @@ class RGGameBase:
         self.timing_max = timing_max
         self.enabled = True
         self.channel = channel
+        self._is_done = False
 
-    async def timer(self):
-        while self.limit > 0:
-            if not self.enabled:
-                return
-            self.limit -= 1
-            await asyncio.sleep(1)
-        await self.done()
+    # async def timer(self):
+    #     while self.limit > 0:
+    #         if not self.enabled:
+    #             return
+    #         self.limit -= 1
+    #         await asyncio.sleep(1)
+    #     await self.done()
 
     async def start_game(self):
-        asyncio.get_running_loop().create_task(self.timer())
-        while self.settings.questions and self.enabled:
-            await self.channel.send(":green_circle: :green_circle: :green_circle:")
+        # asyncio.get_running_loop().create_task(self.timer())
+        while self.settings.questions and self.enabled and not self._is_done:
             question = await self.settings.generate_quest()
-            self.settings.allowed = True
             await self.channel.send(question)
             await asyncio.sleep(randint(self.timing_min, self.timing_max))
-            await self.channel.send(":red_circle: :red_circle: :red_circle:")
-            self.settings.allowed = False
-            await asyncio.sleep(randint(self.timing_min, self.timing_max))
-        await self.done()
 
     async def done(self):
-        self.enabled = False
+        self._is_done = True
         passed_players: list[Member] = []
         fails = self.settings.fail_player
-        loser_role = self.settings.loser_role
+        # loser_role = self.settings.loser_role
         while self.settings.registered_player:
             _, player = self.settings.registered_player.popitem()
             if player.correct > 4:
@@ -145,8 +103,3 @@ class RGGameBase:
             colour=discord.Colour.teal(),
         )
         await self.channel.send("Game OVER!", embed=embed)
-        if loser_role:
-            for fail in fails:
-                await fail.add_roles(
-                    loser_role, reason="Losing the game"  # type: ignore
-                )

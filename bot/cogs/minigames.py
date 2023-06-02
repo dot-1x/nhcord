@@ -1,14 +1,14 @@
 from __future__ import annotations
 import asyncio
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from copy import copy
-from random import shuffle
+from random import choice, shuffle
 from typing import TYPE_CHECKING, Dict, List
 
 import discord
 from discord import Colour, option
-from discord.ext.commands import Context
+from discord.ext import commands
 
 from ..models.minigames import (
     RunningGame,
@@ -16,7 +16,6 @@ from ..models.minigames import (
     RGGameBase,
     RGPlayerData,
     RGQuestion,
-    RGGameView,
 )
 from ..data.minigames import BridgeGameSettings, RedGreenGameSettings
 from ..utils.minigames import get_member_by_role
@@ -41,7 +40,7 @@ class MinigamesCog(discord.Cog):
         self.rg_game: Dict[int, RedGreenGameSettings] = {}
 
     async def handle_err_message(
-        self, ctx: discord.ApplicationContext | Context, message: str
+        self, ctx: discord.ApplicationContext | commands.Context, message: str
     ):
         if isinstance(ctx, discord.ApplicationContext):
             await ctx.response.send_message(message, ephemeral=True)
@@ -56,7 +55,7 @@ class MinigamesCog(discord.Cog):
         else:
             raise error
 
-    def cog_check(self, ctx: discord.ApplicationContext | Context):
+    def cog_check(self, ctx: discord.ApplicationContext | commands.Context):
         if not any(
             (
                 ctx.author.guild_permissions.manage_messages,
@@ -107,17 +106,19 @@ class MinigamesCog(discord.Cog):
         channel = msg.channel.id
         if self.rg_game and channel in self.rg_game:
             settings = self.rg_game[channel]
-            if not settings.answer or msg.author.id not in settings.registered_player:
-                return
+            if msg.author.id not in settings.registered_player:
+                return print(f"player {msg.author} not registered!")
             player = settings.registered_player[msg.author.id]
+            if not settings.allowed:
+                return settings.eliminate_player(player.author)
+            if not settings.answer:
+                return
             if player.is_afk():
                 print(f"Player {msg.author} is afk")
                 return settings.eliminate_player(player.author)
             player.afk_counter = None  # remove the afk from player
             if player.correct >= settings.min_correct:
                 return
-            if not settings.allowed:
-                return settings.eliminate_player(player.author)
             if not player.valid_turn():
                 return
             if msg.content.lower() == settings.answer.lower():
@@ -153,6 +154,13 @@ class MinigamesCog(discord.Cog):
         required=False,
         default=None,
     )
+    @option(
+        name="winner_role",
+        type=discord.Role,
+        description="Assigned role who win the game",
+        required=False,
+        default=None,
+    )
     async def glass_game(
         self,
         ctx: discord.ApplicationContext,
@@ -160,9 +168,14 @@ class MinigamesCog(discord.Cog):
         limit: int,
         segements: int,
         loser_role: discord.Role | None = None,
+        winner_role: discord.Role | None = None,
     ):
         await ctx.defer()
-        if role == loser_role:
+        if not isinstance(ctx.channel, discord.TextChannel):
+            return await ctx.respond("Must be in text channel")
+        if role == loser_role or (
+            winner_role and loser_role and winner_role == loser_role
+        ):
             return await ctx.respond(
                 "Cannot assign same role for player and loser", ephemeral=True
             )
@@ -176,24 +189,21 @@ class MinigamesCog(discord.Cog):
             title="Game details",
             description=(
                 "Rules:\n"
-                + f"There will be **{segements}** bridge segments\n"
+                + f"There will be **{segements}** bridge **segments**\n"
                 + "Select the button bellow to reveal whether the bridge is safe or not\n"
                 + "If you fail the bridge, you will be eliminated directly\n"
-                + "If the time limit runs out, before segments reached "
+                + "If the time limit runs out, before **segments** reached "
                 + "everyone in this stage gonna fail"
             ),
             fields=[
                 discord.EmbedField("Players", str(len(players))),
                 discord.EmbedField("Time Limit", f"{limit} minute(s)"),
                 discord.EmbedField("Loser role", str(loser_role)),
+                discord.EmbedField("Winner role", str(winner_role)),
             ],
         )
         await ctx.respond(f"{role.mention} Prepare your game!", embed=detail_embed)
         shuffle(players)
-        await ctx.channel.send(
-            f"Please watch the play order {role.mention}\n"
-            + ", ".join(f"({idx}. {m.mention})" for idx, m in enumerate(players, 1))
-        )
         settings = BridgeGameSettings(
             channel_id=ctx.channel_id or 0,
             turn=players.pop(0),
@@ -201,20 +211,26 @@ class MinigamesCog(discord.Cog):
             players=players,
             registered_player=copy(players),
             loser_role=loser_role,
+            winner_role=winner_role,
             running=True,
         )
-        view = BridgeGameView(self.bot, settings, ctx.author, limit * 60)
+        settings.move_segments()
+        view = BridgeGameView(
+            self.bot,
+            settings,
+            ctx.author,
+            ctx.channel,
+            datetime.now() + timedelta(minutes=limit),
+        )
         file, embed = settings.generate_image()
         await asyncio.sleep(5)
         view.msg = await ctx.followup.send(
-            f"GAME START!\n{settings.turn.mention}'s turn",
+            f"GAME START!\nTimeleft: <t:{round(view.deadline.timestamp())}:R>\n{settings.turn.mention}'s turn",
             view=view,
             wait=True,
             file=file,
             embed=embed,
         )
-        view.timeleft = await ctx.channel.send(f"Timeleft: {60*limit}s")
-        self.bot.loop.create_task(view.countdown())
 
     @mg_game.command(description="red green game based on questions")
     @option(
@@ -289,7 +305,7 @@ class MinigamesCog(discord.Cog):
 
         players = {
             member.id: RGPlayerData(member)
-            async for member in get_member_by_role(ctx.guild, role, loser_role)
+            async for member in get_member_by_role(ctx.guild, role, None)
         }
         if not players:
             return await ctx.respond("No players were found on that role!")
@@ -297,7 +313,7 @@ class MinigamesCog(discord.Cog):
             quest = [
                 RGQuestion(q["q"], q["a"]) for q in json.loads(await quests.read())
             ]
-        except (KeyError, json.JSONDecodeError):
+        except (KeyError, json.JSONDecodeError, UnicodeDecodeError):
             with open("data/example.json", "rb") as exp:
                 prettify = json.dumps(json.load(exp), indent=4)
             return await ctx.respond(
@@ -313,15 +329,19 @@ class MinigamesCog(discord.Cog):
             fields=[
                 discord.EmbedField("Players", str(len(players))),
                 discord.EmbedField("Time Limit", f"{limit}m"),
-                discord.EmbedField("Timing", f"{timing_min}s - {timing_max}s"),
-                discord.EmbedField("Quests", f"{len(quest)} quest(s)"),
+                discord.EmbedField(
+                    "Timing between questions",
+                    f"{timing_min}s - {timing_max}s",
+                ),
+                discord.EmbedField("Questions", f"{len(quest)} question(s)"),
                 discord.EmbedField("Loser role", str(loser_role)),
-                discord.EmbedField("Minimum correct", str(min_correct)),
+                discord.EmbedField("Minimum correct answer", str(min_correct)),
             ],
             colour=discord.Colour.blurple(),
         )
         shuffle(quest)
         settings = RedGreenGameSettings(
+            base=None,
             channel_id=ctx.channel_id or 0,
             registered_player=players,
             running=True,
@@ -331,5 +351,19 @@ class MinigamesCog(discord.Cog):
         )
         self.rg_game.update({ctx.channel_id or 0: settings})
         game = RGGameBase(settings, timing_max, timing_min, limit * 60, ctx.channel)
-        view = RGGameView(self.bot, game)
-        await ctx.followup.send(embed=emb, view=view)
+        settings.base = game
+        await ctx.followup.send(embed=emb)
+
+    @commands.command(name="rgsignal")
+    async def set_rg_signal(self, ctx: commands.Context):
+        if ctx.channel.id not in self.rg_game:
+            return await ctx.reply("Currently no running game on this channel")
+        settings = self.rg_game[ctx.channel.id]
+        if choice([True, False]):
+            await ctx.reply(":green_circle: :green_circle: :green_circle:")
+            question = await settings.generate_quest()
+            settings.allowed = True
+            await ctx.reply(question)
+        else:
+            await ctx.reply(":red_circle: :red_circle: :red_circle:")
+            settings.allowed = False
