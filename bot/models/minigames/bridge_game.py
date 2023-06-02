@@ -144,16 +144,6 @@ class BridgeGameView(View):
                 for name, val, inline in [
                     ("Player Alive", len(players), True),
                     ("Player Failed", len(fails), True),
-                    (
-                        "Players Alive",
-                        "\n".join(player.mention for player in players),
-                        False,
-                    ),
-                    (
-                        "Players Failed",
-                        "\n".join(player.mention for player in fails),
-                        False,
-                    ),
                 ]
             ]
             self.disable_all_items()

@@ -44,9 +44,12 @@ class RedGreenGameSettings(BaseSettings):
         return quest.quest
 
     def eliminate_player(self, player: Member | User):
-        elim = self.registered_player.pop(player.id)
+        try:
+            elim = self.registered_player.pop(player.id)
+        except KeyError:
+            self.fail_player.append(player)  # type: ignore
+            return
         self.fail_player.append(elim.author)
-        print(f"{elim.author} eliminated!")
 
 
 @dataclass(slots=True)

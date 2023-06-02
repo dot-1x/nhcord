@@ -6,11 +6,14 @@ from random import randint
 from typing import TYPE_CHECKING
 from datetime import datetime, timedelta
 
-from discord import Member
 import discord
+from discord import Member
+
+from ...utils.check import is_admin
 
 if TYPE_CHECKING:
     from ...data.minigames import RedGreenGameSettings
+    from bot.bot import NhCord
 
 
 @dataclass
@@ -43,6 +46,41 @@ class RGPlayerData:
             print(f"{self.author} is on wrong cooldown!")
             return False
         return True
+
+
+class RGGameView(discord.ui.View):
+    def __init__(self, bot: NhCord, game: RGGameBase):
+        super().__init__(timeout=60 * 60, disable_on_timeout=True)
+        self.bot = bot
+        self.game = game
+
+    @discord.ui.button(label="Start Game", style=discord.ButtonStyle.primary)
+    async def start_game(self, _, interaction: discord.Interaction):
+        if isinstance(interaction.user, discord.Member) and not is_admin(
+            interaction.user
+        ):
+            return await interaction.response.send_message(
+                "This button is not for you", ephemeral=True
+            )
+        await self.disable()
+        await self.game.start_game()
+
+    @discord.ui.button(label="Cancel Game", style=discord.ButtonStyle.danger)
+    async def cancel_game(self, _, interaction: discord.Interaction):
+        if isinstance(interaction.user, discord.Member) and not is_admin(
+            interaction.user
+        ):
+            return await interaction.response.send_message(
+                "This button is not for you", ephemeral=True
+            )
+        await self.disable()
+        await self.game.start_game()
+
+    async def disable(self):
+        msg = self.message
+        if msg:
+            self.disable_all_items()
+            await msg.edit(view=self)
 
 
 class RGGameBase:
@@ -103,16 +141,6 @@ class RGGameBase:
                     inline=True,
                 ),
                 discord.EmbedField("Total Fail Player", str(len(fails)), inline=True),
-                discord.EmbedField(
-                    "Passed Players",
-                    "\n".join(player.mention for player in passed_players),
-                    inline=False,
-                ),
-                discord.EmbedField(
-                    "Fail Players",
-                    "\n".join(player.mention for player in fails),
-                    inline=True,
-                ),
             ],
             colour=discord.Colour.teal(),
         )

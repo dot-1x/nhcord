@@ -16,6 +16,7 @@ from ..models.minigames import (
     RGGameBase,
     RGPlayerData,
     RGQuestion,
+    RGGameView,
 )
 from ..data.minigames import BridgeGameSettings, RedGreenGameSettings
 from ..utils.minigames import get_member_by_role
@@ -106,17 +107,17 @@ class MinigamesCog(discord.Cog):
         channel = msg.channel.id
         if self.rg_game and channel in self.rg_game:
             settings = self.rg_game[channel]
-            if not settings.answer or not msg.author.id in settings.registered_player:
+            if not settings.answer or msg.author.id not in settings.registered_player:
                 return
             player = settings.registered_player[msg.author.id]
             if player.is_afk():
                 print(f"Player {msg.author} is afk")
-                return
+                return settings.eliminate_player(player.author)
             player.afk_counter = None  # remove the afk from player
             if player.correct >= settings.min_correct:
                 return
             if not settings.allowed:
-                return settings.eliminate_player(msg.author)
+                return settings.eliminate_player(player.author)
             if not player.valid_turn():
                 return
             if msg.content.lower() == settings.answer.lower():
@@ -287,9 +288,8 @@ class MinigamesCog(discord.Cog):
             )
 
         players = {
-            m.id: RGPlayerData(m)
-            async for m in ctx.guild.fetch_members()
-            if m.get_role(role.id) and m.bot is False
+            member.id: RGPlayerData(member)
+            async for member in get_member_by_role(ctx.guild, role, loser_role)
         }
         if not players:
             return await ctx.respond("No players were found on that role!")
@@ -331,7 +331,5 @@ class MinigamesCog(discord.Cog):
         )
         self.rg_game.update({ctx.channel_id or 0: settings})
         game = RGGameBase(settings, timing_max, timing_min, limit * 60, ctx.channel)
-        await ctx.followup.send(embed=emb)
-        await ctx.send("Game start soon!")
-        await asyncio.sleep(5)
-        await game.start_game()
+        view = RGGameView(self.bot, game)
+        await ctx.followup.send(embed=emb, view=view)

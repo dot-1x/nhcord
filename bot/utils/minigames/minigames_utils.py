@@ -35,7 +35,7 @@ async def get_member_by_role(guild: Guild, role: Role, role_except: Role | None)
     Yields:
         discord.Member: founded member
     """
-    async for member in guild.fetch_members():
+    for member in guild.members:
         if (
             member.get_role(role.id)
             and (not member.get_role(role_except.id) if role_except else True)

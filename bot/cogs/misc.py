@@ -4,6 +4,7 @@ from time import perf_counter
 from typing import TYPE_CHECKING
 from discord import Cog, option, slash_command
 import discord
+from discord.commands import ApplicationContext
 
 if TYPE_CHECKING:
     from bot.bot import NhCord
@@ -12,6 +13,11 @@ if TYPE_CHECKING:
 class MiscCog(Cog):
     def __init__(self, bot: NhCord) -> None:
         self.bot = bot
+
+    def cog_check(self, ctx: ApplicationContext) -> bool:
+        if not ctx.author.id in [732842920889286687]:
+            return False
+        return True
 
     @slash_command()
     @option(
@@ -31,7 +37,9 @@ class MiscCog(Cog):
             + f"Manage Permission: {perms.manage_permissions}\n"
         )
 
-    @slash_command()
+    @slash_command(
+        description="This will call discord API and fetch all members on current guild"
+    )
     async def fetch_all_members(self, ctx: discord.ApplicationContext):
         await ctx.defer()
         start = perf_counter()
@@ -42,5 +50,19 @@ class MiscCog(Cog):
             if member.bot:
                 bot += 1
         await ctx.respond(
-            f"Fetched {members} server members, {bot} server bots, in {perf_counter() - start}"
+            f"Fetched {members} server members, {bot} server bots, in {(perf_counter() - start):.2f}s"
+        )
+
+    @slash_command()
+    async def cached_members(self, ctx: discord.ApplicationContext):
+        await ctx.defer()
+        start = perf_counter()
+        count = 0
+        bot = 0
+        for member in ctx.guild.members:
+            count += 1
+            if member.bot:
+                bot += 1
+        await ctx.respond(
+            f"Cached {count} server members, {bot} server bots, in {(perf_counter() - start):.2f}s"
         )
