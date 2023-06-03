@@ -11,7 +11,6 @@ from discord import Member
 
 if TYPE_CHECKING:
     from ...data.minigames import RedGreenGameSettings
-    from bot.bot import NhCord
 
 
 @dataclass
@@ -59,33 +58,30 @@ class RGGameBase:
         self.settings = settings
         self.timing_min = timing_min
         self.timing_max = timing_max
-        self.enabled = True
+        self.enabled = False
         self.channel = channel
-        self._is_done = False
-
-    # async def timer(self):
-    #     while self.limit > 0:
-    #         if not self.enabled:
-    #             return
-    #         self.limit -= 1
-    #         await asyncio.sleep(1)
-    #     await self.done()
+        self.is_done = False
 
     async def start_game(self):
-        # asyncio.get_running_loop().create_task(self.timer())
-        while self.settings.questions and self.enabled and not self._is_done:
+        self.enabled = True
+        self.settings.allowed = True
+        while self.settings.questions and self.enabled and not self.is_done:
             question = await self.settings.generate_quest()
             await self.channel.send(question)
             await asyncio.sleep(randint(self.timing_min, self.timing_max))
+        if not self.settings.questions:
+            print("No more questions")
+            await self.done()
+        print("Stopped questions")
 
     async def done(self):
-        self._is_done = True
+        self.is_done = True
         passed_players: list[Member] = []
         fails = self.settings.fail_player
         # loser_role = self.settings.loser_role
         while self.settings.registered_player:
             _, player = self.settings.registered_player.popitem()
-            if player.correct > 4:
+            if player.correct >= self.settings.min_correct:
                 passed_players.append(player.author)
             else:
                 fails.append(player.author)
@@ -102,4 +98,4 @@ class RGGameBase:
             ],
             colour=discord.Colour.teal(),
         )
-        await self.channel.send("Game OVER!", embed=embed)
+        await self.channel.send("Game over!", embed=embed)

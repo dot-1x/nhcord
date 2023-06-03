@@ -29,6 +29,7 @@ class BaseSettings:
 @dataclass(slots=True)
 class RedGreenGameSettings(BaseSettings):
     base: RGGameBase | None
+    invoker: Member
     questions: List[RGQuestion]
     registered_player: Dict[int, RGPlayerData]
     allowed: bool = False

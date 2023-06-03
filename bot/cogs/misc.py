@@ -66,3 +66,20 @@ class MiscCog(Cog):
         await ctx.respond(
             f"Cached {count} server members, {bot} server bots, in {(perf_counter() - start):.2f}s"
         )
+
+    @slash_command()
+    @option(name="member", type=discord.Member)
+    async def get_user_perms(
+        self, ctx: discord.ApplicationContext, member: discord.Member
+    ):
+        if not await ctx.bot.is_owner(ctx.author):
+            return
+        perms = member.guild_permissions
+        print(dir(perms))
+        await ctx.respond(
+            f"Manage roles: {perms.manage_roles}\n"
+            + f"Move member: {perms.move_members}\n"
+            + f"Moderate member: {perms.moderate_members}"
+            + f"Manage guild: {perms.manage_guild}",
+            ephemeral=True,
+        )

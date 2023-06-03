@@ -1,6 +1,8 @@
 from __future__ import annotations
 import asyncio
+import csv
 import json
+from io import StringIO
 from datetime import datetime, timedelta
 from copy import copy
 from random import choice, shuffle
@@ -9,6 +11,8 @@ from typing import TYPE_CHECKING, Dict, List
 import discord
 from discord import Colour, option
 from discord.ext import commands
+
+from bot.utils.check import is_admin
 
 from ..models.minigames import (
     RunningGame,
@@ -43,7 +47,7 @@ class MinigamesCog(discord.Cog):
         self, ctx: discord.ApplicationContext | commands.Context, message: str
     ):
         if isinstance(ctx, discord.ApplicationContext):
-            await ctx.response.send_message(message, ephemeral=True)
+            await ctx.response.send_message(message)
         else:
             await ctx.reply(message)
 
@@ -56,14 +60,7 @@ class MinigamesCog(discord.Cog):
             raise error
 
     def cog_check(self, ctx: discord.ApplicationContext | commands.Context):
-        if not any(
-            (
-                ctx.author.guild_permissions.manage_messages,
-                ctx.author.guild_permissions.manage_channels,
-                ctx.author.guild_permissions.manage_roles,
-                ctx.author.guild_permissions.manage_guild,
-            )
-        ):
+        if not is_admin(ctx.author):
             self.bot.loop.create_task(
                 self.handle_err_message(ctx, "You cannot perform this action")
             )
@@ -106,6 +103,8 @@ class MinigamesCog(discord.Cog):
         channel = msg.channel.id
         if self.rg_game and channel in self.rg_game:
             settings = self.rg_game[channel]
+            if msg.content.startswith("."):
+                return
             if msg.author.id not in settings.registered_player:
                 return print(f"player {msg.author} not registered!")
             player = settings.registered_player[msg.author.id]
@@ -310,15 +309,20 @@ class MinigamesCog(discord.Cog):
         if not players:
             return await ctx.respond("No players were found on that role!")
         try:
-            quest = [
-                RGQuestion(q["q"], q["a"]) for q in json.loads(await quests.read())
-            ]
-        except (KeyError, json.JSONDecodeError, UnicodeDecodeError):
-            with open("data/example.json", "rb") as exp:
-                prettify = json.dumps(json.load(exp), indent=4)
-            return await ctx.respond(
-                f"Please use the following format:\n```json\n{prettify}```"
-            )
+            buffer = await quests.read()
+            with StringIO(buffer.decode()) as csvf:
+                reader = csv.DictReader(
+                    csvf, delimiter=",", fieldnames=["questions", "answer"]
+                )
+                quest = [
+                    RGQuestion(questions["questions"], questions["answer"])
+                    for questions in reader
+                ]
+        except (KeyError, UnicodeDecodeError, IndexError):
+            with open("data/example.csv", "r", encoding="UTF-8") as exp:
+                return await ctx.respond(
+                    f"Please use the following format:\n```csv\n{exp.read()}```"
+                )
         emb = discord.Embed(
             title="Game Details",
             description="There will be some questions appear on the chat"
@@ -342,12 +346,13 @@ class MinigamesCog(discord.Cog):
         shuffle(quest)
         settings = RedGreenGameSettings(
             base=None,
+            invoker=ctx.author,
             channel_id=ctx.channel_id or 0,
             registered_player=players,
             running=True,
             questions=quest,
             loser_role=loser_role,
-            min_correct=min_correct,
+            min_correct=min(len(quest), min_correct),
         )
         self.rg_game.update({ctx.channel_id or 0: settings})
         game = RGGameBase(settings, timing_max, timing_min, limit * 60, ctx.channel)
@@ -359,11 +364,19 @@ class MinigamesCog(discord.Cog):
         if ctx.channel.id not in self.rg_game:
             return await ctx.reply("Currently no running game on this channel")
         settings = self.rg_game[ctx.channel.id]
+        if not settings.base:
+            raise ValueError("base rg game settings is not found!")
+        if settings.base.is_done:
+            return await ctx.reply("Game is done!")
         if choice([True, False]):
-            await ctx.reply(":green_circle: :green_circle: :green_circle:")
-            question = await settings.generate_quest()
-            settings.allowed = True
-            await ctx.reply(question)
+            if not settings.base.enabled:
+                print("Starting questions")
+                await settings.base.start_game()
+            # await ctx.reply(":green_circle: :green_circle: :green_circle:")
+            # question = await settings.generate_quest()
+            # settings.allowed = True
+            # await ctx.reply(question)
         else:
             await ctx.reply(":red_circle: :red_circle: :red_circle:")
+            settings.base.enabled = False
             settings.allowed = False
