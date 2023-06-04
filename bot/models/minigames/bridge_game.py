@@ -1,25 +1,23 @@
 from __future__ import annotations
+from asyncio import get_running_loop
 from datetime import datetime
 
 from typing import TYPE_CHECKING, Optional, Sequence
 from discord import (
-    Bot,
-    ButtonStyle,
     Colour,
-    EmbedField,
     Interaction,
-    Member,
     Message,
     TextChannel,
-    User,
     WebhookMessage,
     Embed,
 )
+import discord
 from discord.ui import View, Button
 
 from ...utils.minigames.minigames_utils import TIMELEFT
 
 if TYPE_CHECKING:
+    from bot.bot import NhCord
     from ...data.minigames import BridgeGameSettings
 
 __all__ = ("BridgeGameView",)
@@ -38,9 +36,9 @@ class BridgeGameButton(Button["BridgeGameView"]):
         **kwargs,
     ):
         super().__init__(
-            style=ButtonStyle.primary
+            style=discord.ButtonStyle.primary
             if not kwargs.get("disabled")
-            else ButtonStyle.gray,
+            else discord.ButtonStyle.gray,
             label=label,
             custom_id=custom_id,
             row=row,
@@ -50,24 +48,64 @@ class BridgeGameButton(Button["BridgeGameView"]):
     async def callback(self, interaction: Interaction):
         if not self.view:
             raise ValueError("View not found!")
-        if interaction.user != self.view.settings.turn:
+        if (
+            isinstance(interaction.user, discord.Member)
+            and interaction.user != self.view.settings.turn
+            # and not is_admin(interaction.user)
+        ):
             return await interaction.response.send_message(
                 "This button is not for you!", ephemeral=True
             )
-        if self.view.settings.safe_point == int(self.custom_id or 1) - 1:
+        if self.view.settings.safe_point == int(self.label or 1) - 1:
             await interaction.response.send_message("You have success!", ephemeral=True)
             await self.view.new_segment()
         else:
             await interaction.response.send_message("You have failed!", ephemeral=True)
-            await self.view.switch_turn(int(self.custom_id or 1) - 1)
+            await self.view.switch_turn(int(self.label or 1) - 1)
+
+
+class BridgeGameChoose(View):
+    def __init__(
+        self,
+        guild: discord.Guild,
+        author: discord.Member | discord.User,
+        select_opt: discord.ui.Select | None = None,
+    ):
+        super().__init__(timeout=600, disable_on_timeout=True)
+        self.author = author
+        self.select = select_opt
+        self.guild = guild
+        self.values: list[discord.Member] = []
+
+    @discord.ui.select(
+        discord.ComponentType.user_select,
+        placeholder="Select user to play",
+        min_values=2,
+        max_values=25,
+    )
+    async def select_user(
+        self, select: discord.ui.Select, interaction: discord.Interaction
+    ):
+        await interaction.response.defer(ephemeral=True)
+        if interaction.user != self.author:
+            return await interaction.response.send_message(
+                "This button is not for you", ephemeral=True
+            )
+        self.disable_all_items()
+        self.values = [val for val in select.values if isinstance(val, discord.Member)]
+        await interaction.edit_original_response(view=self)
+        await interaction.followup.send(
+            f"Selected {len(self.values)} members", ephemeral=True
+        )
+        self.stop()
 
 
 class BridgeGameView(View):
     def __init__(
         self,
-        bot: Bot,
+        bot: NhCord,
         settings: BridgeGameSettings,
-        invoker: User | Member,
+        invoker: discord.User | discord.Member,
         channel: TextChannel,
         timeout: datetime,
     ):
@@ -87,7 +125,8 @@ class BridgeGameView(View):
             for col in range(1, 4):
                 btn = BridgeGameButton(
                     label=str(idx) if col % 2 else "-",
-                    custom_id=str(idx) if col % 2 else None,
+                    # custom_id=str(idx) if col % 2 else None,
+                    custom_id=None,
                     row=row,
                     disabled=not (col % 2),
                 )
@@ -97,7 +136,7 @@ class BridgeGameView(View):
                 if col % 2:
                     self.childs.append(btn)
         switch_btn: Button["BridgeGameView"] = Button(
-            style=ButtonStyle.success, label="Switch Turn", row=3
+            style=discord.ButtonStyle.success, label="Switch Turn", row=3
         )
         switch_btn.callback = self.check_switch  # type: ignore
         self.childs.append(switch_btn)  # type: ignore
@@ -147,8 +186,17 @@ class BridgeGameView(View):
             await self.settings.new_turn(click_point)
         except ValueError:
             return await self.done(kill=True)
-        file, embed = self.settings.generate_image(reveal=False)
-        await self.msg.edit(file=file, embed=embed, view=self)
+        kwargs = {}
+        if click_point is not None:
+            file, embed = self.settings.generate_image(reveal=False)
+            kwargs.update({"file": file})
+            kwargs.update({"embed": embed})
+        await self.msg.edit(
+            content=TIMELEFT.format(time=round(self.deadline.timestamp()))
+            + f"{self.settings.turn.mention}'s turn",
+            view=self,
+            **kwargs,
+        )
 
     async def done(self, kill=False):
         if self.msg:
@@ -159,7 +207,7 @@ class BridgeGameView(View):
                 players.append(self.settings.turn)
             self.disabled = True
             fields = [
-                EmbedField(name, str(val), inline)
+                discord.EmbedField(name, str(val), inline)
                 for name, val, inline in [
                     ("Player Alive", len(players), True),
                     ("Player Failed", len(fails), True),
@@ -183,8 +231,8 @@ class BridgeGameView(View):
             if kill:
                 await self.settings.assign_role("failed")
                 return
-            await self.settings.assign_role("winner")
-            await self.settings.assign_role("loser")
+            get_running_loop().create_task(self.settings.assign_role("winner"))
+            get_running_loop().create_task(self.settings.assign_role("loser"))
 
     async def on_timeout(self):
         await self.done(True)

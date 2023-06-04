@@ -4,7 +4,7 @@ import asyncio
 from dataclasses import dataclass, field
 from random import randint
 from typing import TYPE_CHECKING, Dict, List, Literal
-from discord import Colour, Embed, Member, File, Role, User
+from discord import Colour, Embed, Member, File, Role, TextChannel, User
 
 from ...utils.minigames import create_image_grid
 
@@ -13,7 +13,9 @@ if TYPE_CHECKING:
     from ...models.minigames import RGQuestion, RGPlayerData, RGGameBase
 
 GLASS_GAME_FORMATTER = "Segments: {}\n{}'s turn!\nWhich bridge is SAFE?!!!"
-
+THUMBNAIL_URL = (
+    "https://www.vsomglass.com/wp-content/uploads/2021/10/SQUID-GAME-GLASS-BRIDGE-1.jpg"
+)
 BRIDGE_RULES = "Select the button bellow to reveal whether the bridge is safe or not\n\
 If you fail the bridge, you will be eliminated directly\n\
 If the time limit runs out, before segments reached\n\
@@ -30,24 +32,28 @@ class BaseSettings:
 class RedGreenGameSettings(BaseSettings):
     base: RGGameBase | None
     invoker: Member
-    questions: List[RGQuestion]
     registered_player: Dict[int, RGPlayerData]
-    allowed: bool = False
+    channel: TextChannel
+    allowed: bool = True
     fail_player: List[Member] = field(default_factory=list)
     loser_role: Role | None = None
-    answer: str | None = None
     min_correct: int = 5
+    initiated: bool = False
 
-    async def generate_quest(self):
-        quest = self.questions.pop()
-        self.answer = quest.answer
+    # async def generate_quest(self):
+    #     quest = self.questions.pop()
+    #     self.answer = quest.answer
+    #     for _, player in self.registered_player.items():
+    #         player.answered = False
+    #         await asyncio.sleep(0)
+    #     return quest.quest
+
+    def reset_turn(self):
         for _, player in self.registered_player.items():
             player.answered = False
-            await asyncio.sleep(0)
-        return quest.quest
 
     def eliminate_player(self, player: Member | User):
-        print(f"{player} eliminated")
+        emb = Embed(description=f"{player.mention} *Eliminated*", color=Colour.red())
         if self.loser_role:
             asyncio.get_running_loop().create_task(player.add_roles([self.loser_role]))  # type: ignore
         try:
@@ -56,9 +62,7 @@ class RedGreenGameSettings(BaseSettings):
             self.fail_player.append(player)  # type: ignore
             return
         self.fail_player.append(elim.author)
-
-    def switch_signal(self):
-        ...
+        asyncio.get_running_loop().create_task(self.channel.send(embed=emb))
 
 
 @dataclass(slots=True)
@@ -80,7 +84,7 @@ class BridgeGameSettings(BaseSettings):
         self.revealed_bridge = []
 
     async def new_turn(self, safe_pos: int | None):
-        if safe_pos is not None:
+        if safe_pos is not None and safe_pos not in self.revealed_bridge:
             self.revealed_bridge.append(safe_pos)
         self.fail_player.append(self.turn)
         if self.loser_role:
@@ -102,6 +106,7 @@ class BridgeGameSettings(BaseSettings):
             description=f"**Panel: {self.segment}**\n" + BRIDGE_RULES,
             colour=Colour.teal(),
         )
+        embed.set_thumbnail(url=THUMBNAIL_URL)
         embed.set_image(url="attachment://bridgechoose.png")
         return img, embed
 

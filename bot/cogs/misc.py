@@ -37,6 +37,24 @@ class MiscCog(Cog):
             + f"Manage Permission: {perms.manage_permissions}\n"
         )
 
+    # @slash_command()
+    # async def get_role_perms(
+    #     self,
+    #     ctx: discord.ApplicationContext,
+    #     role: discord.Role,
+    #     channel: discord.TextChannel,
+    # ):
+    #     perms = channel.permissions_for(role)
+    #     await ctx.respond(
+    #         f"{role} permission for {channel.mention}:\n"
+    #         + f"Read History: {perms.read_message_history}\n"
+    #         + f"Manage Channel: {perms.manage_channels}\n"
+    #         + f"Send Message: {perms.send_messages}\n"
+    #         + f"Manage Permission: {perms.manage_permissions}\n"
+    #         + f"Manage messages: {perms.manage_messages}\n"
+    #         + f"Manage Roles: {perms.manage_roles}"
+    #     )
+
     @slash_command(
         description="This will call discord API and fetch all members on current guild"
     )
