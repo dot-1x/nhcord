@@ -3,14 +3,14 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
 from random import randint
-from typing import TYPE_CHECKING, Dict, List, Literal
+from typing import TYPE_CHECKING, Dict, List, Literal, Set
 from discord import Colour, Embed, Member, File, Role, TextChannel, User
 
 from ...utils.minigames import create_image_grid
 
 
 if TYPE_CHECKING:
-    from ...models.minigames import RGQuestion, RGPlayerData, RGGameBase
+    from ...models.minigames import RGPlayerData, RGGameBase
 
 GLASS_GAME_FORMATTER = "Segments: {}\n{}'s turn!\nWhich bridge is SAFE?!!!"
 THUMBNAIL_URL = (
@@ -19,7 +19,8 @@ THUMBNAIL_URL = (
 BRIDGE_RULES = "Select the button bellow to reveal whether the bridge is safe or not\n\
 If you fail the bridge, you will be eliminated directly\n\
 If the time limit runs out, before segments reached\n\
-everyone in this stage gonna fail"
+everyone in this stage gonna fail\n\
+you can switch between players by clicking switch button"
 
 
 @dataclass
@@ -35,7 +36,7 @@ class RedGreenGameSettings(BaseSettings):
     registered_player: Dict[int, RGPlayerData]
     channel: TextChannel
     allowed: bool = False
-    fail_player: List[Member] = field(default_factory=list)
+    fail_player: Set[Member] = field(default_factory=set)
     loser_role: Role | None = None
     min_correct: int = 5
     initiated: bool = False
@@ -53,12 +54,12 @@ class RedGreenGameSettings(BaseSettings):
         if self.loser_role:
             loop.create_task(player.add_roles(self.loser_role))  # type: ignore
         try:
-            # elim = self.registered_player.pop(player.id)
-            elim = self.registered_player[player.id]
-        except KeyError:
-            self.fail_player.append(player)  # type: ignore
+            elim = self.registered_player.pop(player.id)
+            # elim = self.registered_player[player.id]
+        except (KeyError, IndexError):
+            self.fail_player.add(player)  # type: ignore
             return
-        self.fail_player.append(elim.author)
+        self.fail_player.add(elim.author)
         loop.create_task(self.channel.send(embed=emb))
 
 
@@ -81,14 +82,16 @@ class BridgeGameSettings(BaseSettings):
         self.revealed_bridge = []
 
     async def new_turn(self, safe_pos: int | None):
-        if safe_pos is not None and safe_pos not in self.revealed_bridge:
-            self.revealed_bridge.append(safe_pos)
-        self.fail_player.append(self.turn)
+        if safe_pos is not None:
+            if safe_pos not in self.revealed_bridge:
+                self.revealed_bridge.append(safe_pos)
+            self.fail_player.append(self.turn)
         if self.loser_role:
             await self.turn.add_roles(self.loser_role)  # type: ignore
         if not self.players:
             raise ValueError("no more players!")
-        self.players.append(self.turn)
+        if safe_pos is None:  # assume player clicked switch player
+            self.players.append(self.turn)
         self.turn = self.players.pop(0)
         return self.turn
 
@@ -117,7 +120,5 @@ class BridgeGameSettings(BaseSettings):
                     self.winner_role, reason="Winning the game"  # type: ignore
                 )
         elif target == "failed" and self.loser_role:
-            self.fail_player.append(self.turn)
-            players = self.fail_player + self.players
-            for player in players:
+            for player in self.registered_player:
                 await player.add_roles(self.loser_role)  # type: ignore

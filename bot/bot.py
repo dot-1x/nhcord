@@ -1,3 +1,4 @@
+import secrets
 import traceback
 from typing import Any
 from discord import CheckFailure, Intents
@@ -22,13 +23,21 @@ class NhCord(commands.Bot):  # pylint: disable=R0901
             intents=intent,
             owner_ids=[630659954944114689, 732842920889286687],
             *args,
-            **options
+            **options,
         )
         self.log = BotLogger("[BOT]")
         self.load_extension(".cogs", package="bot", recursive=False, store=False)
 
-    def log_exc(self, exception: Exception):
+    def log_exc(self, ctx: ApplicationContext | Context, exception: Exception):
+        err_id = secrets.token_hex(4).upper()
+        if isinstance(ctx, ApplicationContext):
+            self.loop.create_task(
+                ctx.respond(f"An error occured! ID: {err_id}", ephemeral=True)
+            )
+        else:
+            self.loop.create_task(ctx.reply(f"An error occured! ID: {err_id}"))
         with open("./bot/logs/exceptions.log", "a", encoding="utf-8") as excfile:
+            excfile.write(f"\n{err_id}\n")
             traceback.print_exception(
                 type(exception),
                 exception,
@@ -37,22 +46,24 @@ class NhCord(commands.Bot):  # pylint: disable=R0901
             )
 
     async def on_application_command_error(
-        self, _: ApplicationContext, exception: DiscordException
+        self, context: ApplicationContext, exception: DiscordException
     ):
         if isinstance(exception, CheckFailure):
             return
         self.log.critical("An Error Occured!")
-        self.log_exc(exception)
+        self.log_exc(context, exception)
 
-    async def on_command_error(self, _: Context, exception: errors.CommandError):
+    async def on_command_error(self, context: Context, exception: errors.CommandError):
         if isinstance(exception, CheckFailure):
             return
         self.log.critical("An Error Occured!")
-        self.log_exc(exception)
+        self.log_exc(context, exception)
 
     async def on_error(self, event_method: str, *args: Any, **kwargs: Any):
-        self.log.critical("An error occured in %s", event_method)
-        with open("./bot/logs/exceptions.log", "a", encoding="utf-8") as excfile:
+        err_id = secrets.token_hex(4).upper()
+        self.log.critical("An error occured in %s, id: %s", event_method, err_id)
+        with open("./bot/logs/base_exc.log", "a", encoding="utf-8") as excfile:
+            excfile.write(f"\n{err_id}\n")
             traceback.print_exc(file=excfile)
 
     async def on_ready(self):

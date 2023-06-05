@@ -25,12 +25,10 @@ class RGPlayerData:
     answered: bool = False
     last_wrong: datetime | None = None
     last_answer: str = ""
-    afk_counter: datetime | None = field(default=datetime.now())
+    afk_counter: datetime = field(default=datetime.now())
 
     def is_afk(self):
-        if self.afk_counter and (datetime.now() - self.afk_counter) > timedelta(
-            minutes=20
-        ):
+        if (datetime.now() - self.afk_counter) > timedelta(minutes=20):
             return True
         return False
 

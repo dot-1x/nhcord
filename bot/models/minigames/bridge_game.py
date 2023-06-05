@@ -15,6 +15,8 @@ from discord import (
 import discord
 from discord.ui import View, Button
 
+from bot.logs.custom_logger import BotLogger
+
 from ...utils.minigames.minigames_utils import TIMELEFT
 
 if TYPE_CHECKING:
@@ -25,6 +27,8 @@ __all__ = ("BridgeGameView", "BridgeGameChoose")
 THUMBNAIL_URL = (
     "https://www.vsomglass.com/wp-content/uploads/2021/10/SQUID-GAME-GLASS-BRIDGE-1.jpg"
 )
+
+_log = BotLogger("[MG BRIDGE]")
 
 
 class BridgeGameButton(Button["BridgeGameView"]):
@@ -137,9 +141,8 @@ class BridgeGameView(View):
                 )
                 if col % 2:
                     idx += 1
-                self.add_item(btn)
-                if col % 2:
                     self.childs.append(btn)
+                self.add_item(btn)
         switch_btn: Button["BridgeGameView"] = Button(
             style=discord.ButtonStyle.success, label="Switch Turn", row=3
         )
@@ -159,11 +162,11 @@ class BridgeGameView(View):
 
     async def new_segment(self):
         if not self.msg:
-            print("message were not found!")
+            _log.warning("message were not found!")
             return
-        self.disable_all_items()
+        # self.disable_all_items()
         file, embed = self.settings.generate_image(reveal=True)
-        await self.msg.edit(file=file, embed=embed, view=self)
+        await self.msg.edit(file=file, embed=embed, view=None)
         self.settings.segment += 1
         if self.settings.segment > self.settings.segments:
             return await self.done()
@@ -184,7 +187,7 @@ class BridgeGameView(View):
 
     async def switch_turn(self, click_point: int | None):
         if not self.msg:
-            print("message were not found!")
+            _log.warning("message were not found!")
             return
         try:
             await self.settings.new_turn(click_point)
@@ -205,16 +208,16 @@ class BridgeGameView(View):
     async def done(self):
         if self.msg and not self.disabled:
             self.stop()
-            print("Game done!")
+            _log.info("Game done!")
             self.disabled = True
-            kill = self.settings.segment > self.settings.segments
+            kill = self.settings.segment < self.settings.segments
             fails = self.settings.fail_player
             players = self.settings.players
             if self.settings.turn not in fails and kill:
-                print("turned player appended to fails")
+                _log.info("turned player appended to fails")
                 fails.append(self.settings.turn)
-            else:
-                print("turned player appended to players")
+            if not kill:
+                _log.info("turned player appended to players")
                 players.append(self.settings.turn)
             if kill:
                 fails.extend(players)
@@ -248,11 +251,12 @@ class BridgeGameView(View):
             self.settings.running = False
             if kill:
                 await self.settings.assign_role("failed")
-                return
-            get_running_loop().create_task(self.settings.assign_role("winner"))
-            get_running_loop().create_task(self.settings.assign_role("loser"))
+            else:
+                get_running_loop().create_task(self.settings.assign_role("winner"))
+                get_running_loop().create_task(self.settings.assign_role("loser"))
 
     async def start_timer(self):
         while datetime.now() < self.deadline and not self.disabled:
             await asyncio.sleep(1)
+        _log.info("Timer disabled")
         await self.done()
