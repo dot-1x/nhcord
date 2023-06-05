@@ -4,13 +4,14 @@ import asyncio
 from dataclasses import dataclass, field
 from random import randint
 from typing import TYPE_CHECKING, Dict, List, Literal, Set
-from discord import Colour, Embed, Member, File, Role, TextChannel, User
 
+from discord import Colour, Embed, File, Member, Role, TextChannel, User
+
+from ...logs.custom_logger import BotLogger
 from ...utils.minigames import create_image_grid
 
-
 if TYPE_CHECKING:
-    from ...models.minigames import RGPlayerData, RGGameBase
+    from ...models.minigames import RGGameBase, RGPlayerData
 
 GLASS_GAME_FORMATTER = "Segments: {}\n{}'s turn!\nWhich bridge is SAFE?!!!"
 THUMBNAIL_URL = (
@@ -21,6 +22,7 @@ If you fail the bridge, you will be eliminated directly\n\
 If the time limit runs out, before segments reached\n\
 everyone in this stage gonna fail\n\
 you can switch between players by clicking switch button"
+_log = BotLogger("[SETTINGS]")
 
 
 @dataclass
@@ -85,6 +87,7 @@ class BridgeGameSettings(BaseSettings):
         if safe_pos is not None:
             if safe_pos not in self.revealed_bridge:
                 self.revealed_bridge.append(safe_pos)
+            _log.info("Player %s eliminated from glass game", self.turn.name)
             self.fail_player.append(self.turn)
         if self.loser_role:
             await self.turn.add_roles(self.loser_role)  # type: ignore

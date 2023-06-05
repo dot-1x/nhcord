@@ -1,19 +1,14 @@
 from __future__ import annotations
-from asyncio import get_running_loop
-import asyncio
-from datetime import datetime
 
+import asyncio
+from asyncio import get_running_loop
+from datetime import datetime
 from typing import TYPE_CHECKING, Optional, Sequence
-from discord import (
-    Colour,
-    Interaction,
-    Message,
-    TextChannel,
-    WebhookMessage,
-    Embed,
-)
+
 import discord
-from discord.ui import View, Button
+from discord import (Colour, Embed, Interaction, Message, TextChannel,
+                     WebhookMessage)
+from discord.ui import Button, View
 
 from bot.logs.custom_logger import BotLogger
 
@@ -21,6 +16,7 @@ from ...utils.minigames.minigames_utils import TIMELEFT
 
 if TYPE_CHECKING:
     from bot.bot import NhCord
+
     from ...data.minigames import BridgeGameSettings
 
 __all__ = ("BridgeGameView", "BridgeGameChoose")
@@ -156,6 +152,9 @@ class BridgeGameView(View):
                 "You cannot perform this action", ephemeral=True
             )
         await self.switch_turn(None)
+        _log.info(
+            "%s is switching turn to %s", interaction.user.name, self.settings.turn.name
+        )
         await interaction.response.send_message(
             f"Switched turn to {self.settings.turn}", ephemeral=True
         )

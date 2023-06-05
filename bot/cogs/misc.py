@@ -1,9 +1,10 @@
 from __future__ import annotations
-from time import perf_counter
 
+from time import perf_counter
 from typing import TYPE_CHECKING
-from discord import Cog, option, slash_command
+
 import discord
+from discord import Cog, option, slash_command
 from discord.commands import ApplicationContext
 
 if TYPE_CHECKING:
@@ -37,23 +38,29 @@ class MiscCog(Cog):
             + f"Manage Permission: {perms.manage_permissions}\n"
         )
 
-    # @slash_command()
-    # async def get_role_perms(
-    #     self,
-    #     ctx: discord.ApplicationContext,
-    #     role: discord.Role,
-    #     channel: discord.TextChannel,
-    # ):
-    #     perms = channel.permissions_for(role)
-    #     await ctx.respond(
-    #         f"{role} permission for {channel.mention}:\n"
-    #         + f"Read History: {perms.read_message_history}\n"
-    #         + f"Manage Channel: {perms.manage_channels}\n"
-    #         + f"Send Message: {perms.send_messages}\n"
-    #         + f"Manage Permission: {perms.manage_permissions}\n"
-    #         + f"Manage messages: {perms.manage_messages}\n"
-    #         + f"Manage Roles: {perms.manage_roles}"
-    #     )
+    @slash_command()
+    @option("role", discord.Role, description="Role to check")
+    @option(
+        "channel",
+        discord.TextChannel,
+        description="Text channel to check permission for",
+    )
+    async def get_role_perms(
+        self,
+        ctx: discord.ApplicationContext,
+        role: discord.Role,
+        channel: discord.TextChannel,
+    ):
+        perms = channel.permissions_for(role)
+        await ctx.respond(
+            f"{role} permission for {channel.mention}:\n"
+            + f"Read History: {perms.read_message_history}\n"
+            + f"Manage Channel: {perms.manage_channels}\n"
+            + f"Send Message: {perms.send_messages}\n"
+            + f"Manage Permission: {perms.manage_permissions}\n"
+            + f"Manage messages: {perms.manage_messages}\n"
+            + f"Manage Roles: {perms.manage_roles}"
+        )
 
     @slash_command(
         description="This will call discord API and fetch all members on current guild"

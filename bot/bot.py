@@ -1,6 +1,8 @@
+import json
 import secrets
 import traceback
-from typing import Any
+from typing import Any, TypedDict
+
 from discord import CheckFailure, Intents
 from discord.commands import ApplicationContext
 from discord.errors import DiscordException
@@ -11,6 +13,15 @@ from discord.ext.commands.context import Context
 from .logs import BotLogger
 
 
+class TConfig(TypedDict):
+    prefix: str
+    owner_ids: list[int]
+
+
+with open("config.json", "rb") as config_f:
+    CONFIG: TConfig = json.load(config_f)
+
+
 class NhCord(commands.Bot):  # pylint: disable=R0901
     def __init__(self, *args, **options):
         intent = Intents()
@@ -19,9 +30,9 @@ class NhCord(commands.Bot):  # pylint: disable=R0901
         intent.message_content = True
         intent.guild_messages = True
         super().__init__(
-            ".",
+            CONFIG["prefix"],
             intents=intent,
-            owner_ids=[630659954944114689, 732842920889286687],
+            owner_ids=CONFIG["owner_ids"],
             *args,
             **options,
         )

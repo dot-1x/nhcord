@@ -1,5 +1,5 @@
-from PIL import Image
 from discord import Guild, Role
+from PIL import Image
 
 TIMELEFT = "Timeleft: <t:{time}:R>\n"
 WIDTH, HEIGHT = (160, 120)

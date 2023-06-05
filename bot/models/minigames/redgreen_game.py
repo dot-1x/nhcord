@@ -1,9 +1,9 @@
 from __future__ import annotations
-import asyncio
 
+import asyncio
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 
 import discord
 from discord import Member
@@ -48,8 +48,8 @@ class RGPlayerData:
                 description=f"{msg.author.mention} already answered: {self.last_answer}",
                 color=discord.Color.blue(),
             )
-            await msg.delete()
             await msg.channel.send(embed=emb)
+            await msg.delete()
         if not self.answered:
             self.last_answer = msg.content
             self.answered = True

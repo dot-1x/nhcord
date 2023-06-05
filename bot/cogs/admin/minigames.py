@@ -1,8 +1,9 @@
 from __future__ import annotations
+
 import asyncio
 import json
-from datetime import datetime, timedelta
 from copy import copy
+from datetime import datetime, timedelta
 from random import choice, shuffle
 from typing import TYPE_CHECKING, Dict, List
 
@@ -10,15 +11,10 @@ import discord
 from discord import Colour, option
 from discord.ext import commands
 
-from ...models.minigames import (
-    RunningGame,
-    BridgeGameView,
-    RGGameBase,
-    RGPlayerData,
-    BridgeGameChoose,
-)
 from ...data.minigames import BridgeGameSettings, RedGreenGameSettings
-from ...utils.minigames import get_member_by_role, TIMELEFT
+from ...models.minigames import (BridgeGameChoose, BridgeGameView, RGGameBase,
+                                 RGPlayerData, RunningGame)
+from ...utils.minigames import TIMELEFT, get_member_by_role
 from .admin import AdminCog
 
 if TYPE_CHECKING:

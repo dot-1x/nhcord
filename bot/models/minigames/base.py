@@ -1,10 +1,9 @@
 from __future__ import annotations
-from abc import ABC
 
+from abc import ABC
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Optional, TYPE_CHECKING
-
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from ...data.minigames import BridgeGameSettings, RedGreenGameSettings

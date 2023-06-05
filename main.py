@@ -2,6 +2,7 @@ import os
 
 import httpx
 from dotenv import load_dotenv
+
 from bot import NhCord
 
 # pylint: disable=line-too-long
