@@ -47,7 +47,8 @@ class RGPlayerData:
     async def validate_turn(self, msg: discord.Message):
         if self.answered:
             emb = discord.Embed(
-                description=f"{msg.author.mention} already answered: {self.last_answer}"
+                description=f"{msg.author.mention} already answered: {self.last_answer}",
+                color=discord.Color.blue(),
             )
             await msg.delete()
             await msg.channel.send(embed=emb)
@@ -69,17 +70,6 @@ class RGGameBase:
         self.channel = channel
         self.is_done = False
 
-    # async def start_game(self):
-    #     self.enabled = True
-    #     self.settings.allowed = True
-    #     while self.settings.questions and self.enabled and not self.is_done:
-    #         question = await self.settings.generate_quest()
-    #         await self.channel.send(question)
-    #         await asyncio.sleep(randint(self.timing_min, self.timing_max))
-    #     if not self.settings.questions:
-    #         print("No more questions")
-    #         await self.done()
-    #     print("Stopped questions")
     async def start_timer(self):
         deadline = datetime.now() + timedelta(minutes=self.limit)
         while datetime.now() < deadline:
@@ -87,27 +77,9 @@ class RGGameBase:
         await self.done()
 
     async def done(self):
+        if self.is_done:
+            return
         self.is_done = True
-        passed_players: list[Member] = []
-        fails = self.settings.fail_player
-        # loser_role = self.settings.loser_role
-        # while self.settings.registered_player:
-        #     _, player = self.settings.registered_player.popitem()
-        #     if player.correct >= self.settings.min_correct:
-        #         passed_players.append(player.author)
-        #     else:
-        #         fails.append(player.author)
-        #     await asyncio.sleep(0)
-        embed = discord.Embed(
-            title="Final Stats!",
-            fields=[
-                discord.EmbedField(
-                    "Total Passed player",
-                    str(len(passed_players)),
-                    inline=True,
-                ),
-                discord.EmbedField("Total Fail Player", str(len(fails)), inline=True),
-            ],
-            colour=discord.Colour.teal(),
-        )
-        await self.channel.send("Game over!")
+        # self.settings.allowed = False
+        emb = discord.Embed(description="**GAME OVER !!**")
+        await self.channel.send(embed=emb)

@@ -68,7 +68,7 @@ class MiscCog(Cog):
             if member.bot:
                 bot += 1
         await ctx.respond(
-            f"Fetched {members} server members, {bot} server bots, in {(perf_counter() - start):.2f}s"
+            f"Fetched {members} members, {bot} bots, in {(perf_counter() - start):.2f}s"
         )
 
     @slash_command()

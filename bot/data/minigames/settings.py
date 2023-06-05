@@ -34,35 +34,32 @@ class RedGreenGameSettings(BaseSettings):
     invoker: Member
     registered_player: Dict[int, RGPlayerData]
     channel: TextChannel
-    allowed: bool = True
+    allowed: bool = False
     fail_player: List[Member] = field(default_factory=list)
     loser_role: Role | None = None
     min_correct: int = 5
     initiated: bool = False
 
-    # async def generate_quest(self):
-    #     quest = self.questions.pop()
-    #     self.answer = quest.answer
-    #     for _, player in self.registered_player.items():
-    #         player.answered = False
-    #         await asyncio.sleep(0)
-    #     return quest.quest
-
     def reset_turn(self):
         for _, player in self.registered_player.items():
             player.answered = False
 
-    def eliminate_player(self, player: Member | User):
-        emb = Embed(description=f"{player.mention} *Eliminated*", color=Colour.red())
+    def eliminate_player(self, player: Member | User, afk: bool = False):
+        emb = Embed(
+            description=f"{player.mention} *Eliminated {'For AFK' if afk else ''}*",
+            color=Colour.red(),
+        )
+        loop = asyncio.get_running_loop()
         if self.loser_role:
-            asyncio.get_running_loop().create_task(player.add_roles([self.loser_role]))  # type: ignore
+            loop.create_task(player.add_roles(self.loser_role))  # type: ignore
         try:
-            elim = self.registered_player.pop(player.id)
+            # elim = self.registered_player.pop(player.id)
+            elim = self.registered_player[player.id]
         except KeyError:
             self.fail_player.append(player)  # type: ignore
             return
         self.fail_player.append(elim.author)
-        asyncio.get_running_loop().create_task(self.channel.send(embed=emb))
+        loop.create_task(self.channel.send(embed=emb))
 
 
 @dataclass(slots=True)
@@ -91,7 +88,7 @@ class BridgeGameSettings(BaseSettings):
             await self.turn.add_roles(self.loser_role)  # type: ignore
         if not self.players:
             raise ValueError("no more players!")
-        # self.players.append(self.turn)
+        self.players.append(self.turn)
         self.turn = self.players.pop(0)
         return self.turn
 

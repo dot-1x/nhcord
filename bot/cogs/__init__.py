@@ -1,8 +1,8 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
-from .minigames import MinigamesCog
-from .giveaway import GiveawayCog
+# from .minigames import MinigamesCog
+from .admin import GiveawayCog, MinigamesCog
 from .misc import MiscCog
 
 if TYPE_CHECKING:

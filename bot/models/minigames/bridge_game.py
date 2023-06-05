@@ -1,5 +1,6 @@
 from __future__ import annotations
 from asyncio import get_running_loop
+import asyncio
 from datetime import datetime
 
 from typing import TYPE_CHECKING, Optional, Sequence
@@ -20,7 +21,7 @@ if TYPE_CHECKING:
     from bot.bot import NhCord
     from ...data.minigames import BridgeGameSettings
 
-__all__ = ("BridgeGameView",)
+__all__ = ("BridgeGameView", "BridgeGameChoose")
 THUMBNAIL_URL = (
     "https://www.vsomglass.com/wp-content/uploads/2021/10/SQUID-GAME-GLASS-BRIDGE-1.jpg"
 )
@@ -91,11 +92,15 @@ class BridgeGameChoose(View):
             return await interaction.response.send_message(
                 "This button is not for you", ephemeral=True
             )
-        self.disable_all_items()
         self.values = [val for val in select.values if isinstance(val, discord.Member)]
-        await interaction.edit_original_response(view=self)
         await interaction.followup.send(
             f"Selected {len(self.values)} members", ephemeral=True
+        )
+
+    @discord.ui.button(label="Confirm", style=discord.ButtonStyle.primary)
+    async def confirm(self, _, interaction: discord.Interaction):
+        await interaction.response.send_message(
+            f"Game started! {len(self.values)} players are in", ephemeral=True
         )
         self.stop()
 
@@ -143,7 +148,7 @@ class BridgeGameView(View):
         self.add_item(switch_btn)
 
     async def check_switch(self, interaction: Interaction):
-        if interaction.user != self.invoker:
+        if interaction.user != self.settings.turn:
             return await interaction.response.send_message(
                 "You cannot perform this action", ephemeral=True
             )
@@ -161,7 +166,6 @@ class BridgeGameView(View):
         await self.msg.edit(file=file, embed=embed, view=self)
         self.settings.segment += 1
         if self.settings.segment > self.settings.segments:
-            self.settings.segment = self.settings.segments
             return await self.done()
         # view = BridgeGameView(
         #     self.bot, self.settings, self.invoker, self.channel, self.deadline
@@ -185,7 +189,7 @@ class BridgeGameView(View):
         try:
             await self.settings.new_turn(click_point)
         except ValueError:
-            return await self.done(kill=True)
+            return await self.done()
         kwargs = {}
         if click_point is not None:
             file, embed = self.settings.generate_image(reveal=False)
@@ -198,32 +202,46 @@ class BridgeGameView(View):
             **kwargs,
         )
 
-    async def done(self, kill=False):
-        if self.msg:
+    async def done(self):
+        if self.msg and not self.disabled:
             self.stop()
+            print("Game done!")
+            self.disabled = True
+            kill = self.settings.segment > self.settings.segments
             fails = self.settings.fail_player
             players = self.settings.players
-            if self.settings.turn not in fails:
+            if self.settings.turn not in fails and kill:
+                print("turned player appended to fails")
+                fails.append(self.settings.turn)
+            else:
+                print("turned player appended to players")
                 players.append(self.settings.turn)
-            self.disabled = True
+            if kill:
+                fails.extend(players)
+                players = []
             fields = [
                 discord.EmbedField(name, str(val), inline)
                 for name, val, inline in [
                     ("Player Alive", len(players), True),
                     ("Player Failed", len(fails), True),
-                    ("Last segment", self.settings.segment, True),
+                    ("Last segment", self.settings.segment - 1, True),
                 ]
             ]
             self.disable_all_items()
             emb = Embed(title="Final Stats", fields=fields, colour=Colour.teal())
             emb.set_thumbnail(url=THUMBNAIL_URL)
             await self.msg.edit(view=self)
+            player = (
+                self.settings.winner_role.mention
+                if self.settings.winner_role
+                else "Player"
+            )
             await self.msg.reply(
                 content=TIMELEFT.format(time=round(self.deadline.timestamp()))
                 + (
-                    "Congratulations!! you have won the game"
+                    "**Congratulations!!** you have won the game"
                     if not kill
-                    else "Game Over!! everyone is failed"
+                    else f"**Game Over!!** All {player} is failed"
                 ),
                 embed=emb,
             )
@@ -234,5 +252,7 @@ class BridgeGameView(View):
             get_running_loop().create_task(self.settings.assign_role("winner"))
             get_running_loop().create_task(self.settings.assign_role("loser"))
 
-    async def on_timeout(self):
-        await self.done(True)
+    async def start_timer(self):
+        while datetime.now() < self.deadline and not self.disabled:
+            await asyncio.sleep(1)
+        await self.done()

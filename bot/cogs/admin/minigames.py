@@ -1,8 +1,6 @@
 from __future__ import annotations
 import asyncio
-import csv
 import json
-from io import StringIO
 from datetime import datetime, timedelta
 from copy import copy
 from random import choice, shuffle
@@ -11,25 +9,27 @@ from typing import TYPE_CHECKING, Dict, List
 import discord
 from discord import Colour, option
 from discord.ext import commands
-from bot.models.minigames.bridge_game import BridgeGameChoose
 
-from bot.utils.check import is_admin
-from bot.utils.minigames.minigames_utils import TIMELEFT
-
-from ..models.minigames import RunningGame, BridgeGameView, RGGameBase, RGPlayerData
-from ..data.minigames import BridgeGameSettings, RedGreenGameSettings
-from ..utils.minigames import get_member_by_role
+from ...models.minigames import (
+    RunningGame,
+    BridgeGameView,
+    RGGameBase,
+    RGPlayerData,
+    BridgeGameChoose,
+)
+from ...data.minigames import BridgeGameSettings, RedGreenGameSettings
+from ...utils.minigames import get_member_by_role, TIMELEFT
+from .admin import AdminCog
 
 if TYPE_CHECKING:
-    from ..bot import NhCord
-
-__all__ = ("MinigamesCog",)
+    from ...bot import NhCord
 
 
-class MinigamesCog(discord.Cog):
+class MinigamesCog(AdminCog):
     mg_game = discord.SlashCommandGroup("mg", "Main commands for minigames related")
 
     def __init__(self, bot: NhCord) -> None:
+        super().__init__(bot)
         self.bot = bot
         with open(
             "bot/data/minigames/minigames_settings.json", "r", encoding="utf-8"
@@ -39,59 +39,6 @@ class MinigamesCog(discord.Cog):
         self.running_game: Dict[int, RunningGame] = {}
         self.rg_game: Dict[int, RedGreenGameSettings] = {}
 
-    async def handle_err_message(
-        self, ctx: discord.ApplicationContext | commands.Context, message: str
-    ):
-        if isinstance(ctx, discord.ApplicationContext):
-            await ctx.response.send_message(message)
-        else:
-            await ctx.reply(message)
-
-    async def cog_command_error(
-        self, ctx: discord.ApplicationContext, error: Exception
-    ) -> None:
-        if isinstance(error, discord.CheckFailure):
-            self.bot.log.warning(f"Check failed invoked by {ctx.author}")
-        else:
-            raise error
-
-    def cog_check(self, ctx: discord.ApplicationContext | commands.Context):
-        if not is_admin(ctx.author):
-            self.bot.loop.create_task(
-                self.handle_err_message(ctx, "You cannot perform this action")
-            )
-            return False
-        if isinstance(ctx, discord.ApplicationContext):
-            opts = ctx.selected_options
-            if (
-                opts
-                and any(opt for opt in opts if opt.get("name") == "loser_role")
-                and not ctx.guild.me.guild_permissions.manage_roles
-            ):
-                self.bot.loop.create_task(
-                    self.handle_err_message(
-                        ctx, "Bot needs a permission to change role!"
-                    )
-                )
-                return False
-
-        channel_id = (
-            ctx.interaction.channel_id
-            if isinstance(ctx, discord.ApplicationContext)
-            else ctx.channel.id
-        )
-        cmd_name = ctx.command.name if ctx.command else "no name"
-        if (
-            channel_id in self.running_game
-            and self.running_game[channel_id].settings.running
-            and cmd_name != "stop_game"
-        ):
-            self.bot.loop.create_task(
-                self.handle_err_message(ctx, "Another game is running!")
-            )
-            return False
-        return True
-
     @discord.Cog.listener()
     async def on_message(self, msg: discord.Message):
         if msg.author.bot:
@@ -99,35 +46,22 @@ class MinigamesCog(discord.Cog):
         channel = msg.channel.id
         if self.rg_game and channel in self.rg_game:
             settings = self.rg_game[channel]
-
-            if msg.content.startswith("."):
+            if await self.bot.is_owner(msg.author):  # type: ignore
                 return
             if msg.author.id not in settings.registered_player:
+                await msg.delete()
+                print(f"player {msg.author} not in list")
                 return
             player = settings.registered_player[msg.author.id]
             if not settings.allowed:
-                await msg.delete()
+                # await msg.delete()
                 return settings.eliminate_player(player.author)
 
-            #         if not settings.answer:
-            #             return
             if player.is_afk():
-                return settings.eliminate_player(player.author)
+                return settings.eliminate_player(player.author, True)
 
             player.afk_counter = datetime.now()  # reset the afk from player
-            if not settings.initiated:
-                return
-            #         if player.correct >= settings.min_correct:
-            #             return
             await player.validate_turn(msg)
-
-    #         if msg.content.lower() == settings.answer.lower():
-    #             player.answered = True
-    #             player.correct += 1
-    #             print(f"{msg.author} answered correct")
-    #         else:
-    #             player.last_wrong = datetime.now()
-    #             print(f"{msg.author} answered wrong")
 
     @mg_game.command(description="Squid game - glass game")
     @option(
@@ -180,11 +114,11 @@ class MinigamesCog(discord.Cog):
                 "Cannot assign same role for player and loser", ephemeral=True
             )
         selected = BridgeGameChoose(ctx.guild, ctx.author)
-        await ctx.respond(view=selected)
+        await ctx.respond(view=selected, ephemeral=True)
         await selected.wait()
         players = [player for player in selected.values if player.get_role(role.id)]
         if not players:
-            return await ctx.respond("No players were found!")
+            return await ctx.respond("No players were found!", ephemeral=True)
         detail_embed = discord.Embed(
             colour=Colour.blurple(),
             title="Game details",
@@ -226,11 +160,14 @@ class MinigamesCog(discord.Cog):
         file, embed = settings.generate_image()
         await asyncio.sleep(5)
         view.msg = await ctx.send(
-            f"GAME START!\nTimeleft: <t:{round(view.deadline.timestamp())}:R>\n{settings.turn.mention}'s turn",
+            "GAME START!\n"
+            + TIMELEFT.format(time=round(view.deadline.timestamp()))
+            + f"{settings.turn.mention}'s turn",
             view=view,
             file=file,
             embed=embed,
         )
+        self.bot.loop.create_task(view.start_timer())
 
     @mg_game.command(description="red green game based on questions")
     @option(
@@ -275,7 +212,7 @@ class MinigamesCog(discord.Cog):
 
         players = {
             member.id: RGPlayerData(member)
-            async for member in get_member_by_role(ctx.guild, role, loser_role)
+            async for member in get_member_by_role(ctx.guild, role, None)
         }
         if not players:
             return await ctx.respond("No players were found on that role!")
@@ -308,6 +245,7 @@ class MinigamesCog(discord.Cog):
         game = RGGameBase(settings, limit, ctx.channel)
         settings.base = game
         deadline = datetime.now() + timedelta(minutes=limit)
+        await ctx.send(content=f"{role.mention} prepare your game!")
         await ctx.followup.send(
             content=TIMELEFT.format(time=round(deadline.timestamp())),
             embed=emb,
@@ -323,13 +261,12 @@ class MinigamesCog(discord.Cog):
             raise ValueError("base rg game settings is not found!")
         if settings.base.is_done:
             return await ctx.reply("Game is done!")
-        settings.initiated = True
         settings.reset_turn()
         signal = choice([True, False])
         settings.allowed = signal
         await ctx.reply(":green_circle:" if signal else ":red_circle:")
 
-    @commands.command(name="rgterminate")
+    @commands.command(name="rgkill")
     async def terminate_rg(self, ctx: commands.Context):
         if ctx.channel.id not in self.rg_game:
             return await ctx.reply("Currently no running game on this channel")

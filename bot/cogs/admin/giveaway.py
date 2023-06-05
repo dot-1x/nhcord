@@ -2,22 +2,20 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timedelta
 from random import randrange, shuffle
-
 from typing import TYPE_CHECKING
-import discord
-from discord import (
-    Cog,
-    option,
-)
-from discord.commands import ApplicationContext
 
+import discord
+from discord import option
 from discord.ui import View, button
 from discord.ext import commands
 
-from ..utils.check import is_admin
+from ...logs.custom_logger import BotLogger
+from .admin import AdminCog
 
 if TYPE_CHECKING:
-    from ..bot import NhCord
+    from ...bot import NhCord
+
+_log = BotLogger("[GA COG]")
 
 
 async def get_users_data(bot: NhCord, ids: list[int]):
@@ -76,19 +74,11 @@ class GiveawayView(View):
 
     @button(label="reroll", style=discord.ButtonStyle.success)
     async def reroll(self, _, interaction: discord.Interaction):
-        if not interaction.user:
+        if (
+            not isinstance(interaction.channel, discord.TextChannel)
+            or not interaction.user
+        ):
             return
-        if not isinstance(interaction.channel, discord.TextChannel):
-            return
-        # perms = interaction.channel.permissions_for(interaction.user)  # type: ignore
-        # if (
-        #     not perms.manage_channels
-        #     or not perms.manage_messages
-        #     or not perms.manage_guild
-        # ):
-        #     return await interaction.response.send_message(
-        #         "This button is not for you!", ephemeral=True
-        #     )
         if not self.ended:
             return await interaction.response.send_message(
                 "Giveaway is still running", ephemeral=True
@@ -146,7 +136,7 @@ class GiveawayView(View):
         if not self.message:
             raise ValueError("Message not found!")
         asyncio.create_task(self.reload_participants())
-        self.bot.log.info("Starting giveaway timer!")
+        _log.info("Starting giveaway timer!")
         while datetime.now() < self.deadline:
             await asyncio.sleep(1)
         await self.roll()
@@ -175,7 +165,7 @@ class GiveawayView(View):
         if self.total_paarticipants < 1:
             self.disable_all_items()
             embed.description = "No participants"
-            self.bot.log.warning("Giveaway ended with no participant")
+            _log.warning("Giveaway ended with no participant")
             return await self.message.edit(view=self, embed=embed)
         for children in self.children:
             if (
@@ -188,7 +178,11 @@ class GiveawayView(View):
             return self.disable_all_items()
         participate_btn.disabled = True
 
-        self.winners, embed = await self.get_winners()
+        try:
+            self.winners, embed = await self.get_winners()
+        except discord.Forbidden:
+            await self.message.edit(view=self)
+            return await self.message.reply("I cannot read data channel")
         await self.message.edit(view=self, embed=embed)
         mentions = ", ".join(winner.mention for winner in self.winners)
         await self.message.reply(
@@ -196,16 +190,10 @@ class GiveawayView(View):
         )
 
 
-class GiveawayCog(Cog):
+class GiveawayCog(AdminCog):
     def __init__(self, bot: NhCord) -> None:
+        super().__init__(bot)
         self.bot = bot
-
-    def cog_check(self, ctx: ApplicationContext) -> bool:
-        if not isinstance(ctx.author, discord.Member):
-            return False
-        if not is_admin(ctx.author):
-            return False
-        return True
 
     @commands.slash_command()
     @option(name="name", type=str, description="Set giveaway name")
@@ -246,12 +234,12 @@ class GiveawayCog(Cog):
             description="Click participate to enter!!!",
             color=discord.Color.nitro_pink(),
             fields=[
+                discord.EmbedField(name="Reward", value=reward, inline=False),
                 discord.EmbedField(
                     name="Author",
                     value=ctx.author.mention if not author else author.mention,
                     inline=True,
                 ),
-                discord.EmbedField(name="Reward", value=reward, inline=True),
                 discord.EmbedField(name="Max Winner", value=str(winners), inline=True),
                 discord.EmbedField(
                     name="Role", value=role.mention if role else "None", inline=True

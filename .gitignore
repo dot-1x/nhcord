@@ -132,3 +132,4 @@ tests
 *.jpg
 *.png
 .vscode
+backup

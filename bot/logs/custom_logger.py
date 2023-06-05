@@ -1,4 +1,5 @@
 import logging
+import time
 
 
 class CustomFormatter(logging.Formatter):
@@ -9,6 +10,8 @@ class CustomFormatter(logging.Formatter):
     reset = "\x1b[0m"
     green = "\x1b[32;1m"
     formatstr = "%(asctime)s - %(name)s - [%(levelname)s] - %(message)s"
+    converter = time.gmtime
+    datefmt = "%Y-%m-%d %I:%M:%S %Z"
 
     FORMATS = {
         logging.DEBUG: grey + formatstr + reset,
@@ -20,19 +23,22 @@ class CustomFormatter(logging.Formatter):
 
     def format(self, record):
         log_fmt = self.FORMATS.get(record.levelno)
-        formatter = logging.Formatter(log_fmt)
+        formatter = logging.Formatter(log_fmt, datefmt=self.datefmt)
         return formatter.format(record)
 
 
 class BotLogger(logging.Logger):
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: str, err: bool = False) -> None:
         super().__init__(name, logging.DEBUG)
         console_hndl = logging.StreamHandler()
         console_hndl.setLevel(logging.DEBUG)
         console_hndl.setFormatter(CustomFormatter())
 
         # watch for the path
-        file_handle = logging.FileHandler("./bot/logs/logs.log", encoding="utf-8")
+        file_handle = logging.FileHandler(
+            "./bot/logs/logs.log" if not err else "./bot/logs/exceptions.log",
+            encoding="utf-8",
+        )
         file_handle.setLevel(logging.DEBUG)
         file_handle.setFormatter(logging.Formatter(CustomFormatter.formatstr))
         self.addHandler(file_handle)
