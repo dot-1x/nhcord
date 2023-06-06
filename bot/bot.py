@@ -1,7 +1,6 @@
-import json
 import secrets
 import traceback
-from typing import Any, TypedDict
+from typing import Any
 
 from discord import CheckFailure, Intents
 from discord.commands import ApplicationContext
@@ -10,16 +9,8 @@ from discord.ext import commands
 from discord.ext.commands import errors
 from discord.ext.commands.context import Context
 
+from .config import CONFIG
 from .logs import BotLogger
-
-
-class TConfig(TypedDict):
-    prefix: str
-    owner_ids: list[int]
-
-
-with open("config.json", "rb") as config_f:
-    CONFIG: TConfig = json.load(config_f)
 
 
 class NhCord(commands.Bot):  # pylint: disable=R0901

@@ -16,7 +16,7 @@ class MiscCog(Cog):
         self.bot = bot
 
     def cog_check(self, ctx: ApplicationContext) -> bool:
-        if not ctx.author.id in [732842920889286687]:
+        if not ctx.author.id in self.bot.owner_ids:
             return False
         return True
 

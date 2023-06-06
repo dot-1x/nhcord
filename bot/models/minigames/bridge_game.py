@@ -6,8 +6,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Optional, Sequence
 
 import discord
-from discord import (Colour, Embed, Interaction, Message, TextChannel,
-                     WebhookMessage)
+from discord import Colour, Embed, Interaction, Message, TextChannel, WebhookMessage
 from discord.ui import Button, View
 
 from bot.logs.custom_logger import BotLogger
@@ -102,6 +101,7 @@ class BridgeGameChoose(View):
         await interaction.response.send_message(
             f"Game started! {len(self.values)} players are in", ephemeral=True
         )
+        _log.info("Started glass game")
         self.stop()
 
 
@@ -209,7 +209,7 @@ class BridgeGameView(View):
             self.stop()
             _log.info("Game done!")
             self.disabled = True
-            kill = self.settings.segment < self.settings.segments
+            kill = self.settings.segment <= self.settings.segments
             fails = self.settings.fail_player
             players = self.settings.players
             if self.settings.turn not in fails and kill:
