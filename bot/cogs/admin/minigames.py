@@ -12,8 +12,13 @@ from discord import Colour, option
 from discord.ext import commands
 
 from ...data.minigames import BridgeGameSettings, RedGreenGameSettings
-from ...models.minigames import (BridgeGameChoose, BridgeGameView, RGGameBase,
-                                 RGPlayerData, RunningGame)
+from ...models.minigames import (
+    BridgeGameChoose,
+    BridgeGameView,
+    RGGameBase,
+    RGPlayerData,
+    RunningGame,
+)
 from ...utils.minigames import TIMELEFT, get_member_by_role
 from .admin import AdminCog
 
@@ -111,7 +116,9 @@ class MinigamesCog(AdminCog):
             )
         selected = BridgeGameChoose(ctx.guild, ctx.author)
         await ctx.respond(view=selected, ephemeral=True)
-        await selected.wait()
+        timeout = await selected.wait()
+        if timeout:
+            return
         players = [player for player in selected.values if player.get_role(role.id)]
         if not players:
             return await ctx.respond("No players were found!", ephemeral=True)
