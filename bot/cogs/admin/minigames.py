@@ -11,6 +11,8 @@ import discord
 from discord import Colour, option
 from discord.ext import commands
 
+
+from ...logs.custom_logger import BotLogger
 from ...data.minigames import BridgeGameSettings, RedGreenGameSettings
 from ...models.minigames import (
     BridgeGameChoose,
@@ -24,6 +26,8 @@ from .admin import AdminCog
 
 if TYPE_CHECKING:
     from ...bot import NhCord
+
+_log = BotLogger("[MINIGAMES]")
 
 
 class MinigamesCog(AdminCog):
@@ -118,6 +122,7 @@ class MinigamesCog(AdminCog):
         await ctx.respond(view=selected, ephemeral=True)
         timeout = await selected.wait()
         if timeout:
+            _log.info("Timed out, game canceled")
             return
         players = [player for player in selected.values if player.get_role(role.id)]
         if not players:
