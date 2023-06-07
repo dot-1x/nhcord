@@ -75,10 +75,7 @@ class GiveawayView(View):
 
     @button(label="reroll", style=discord.ButtonStyle.success)
     async def reroll(self, _, interaction: discord.Interaction):
-        if (
-            not isinstance(interaction.channel, discord.TextChannel)
-            or not interaction.user
-        ):
+        if not isinstance(interaction.user, discord.Member):
             return
         if not self.ended:
             return await interaction.response.send_message(
