@@ -56,15 +56,15 @@ class MinigamesCog(AdminCog):
             settings = self.rg_game[channel]
             if msg.content.startswith("."):
                 return
-            # if await self.bot.is_owner(msg.author):  # type: ignore
-            #     return
+            if await self.bot.is_owner(msg.author):  # type: ignore
+                return
             if msg.author.id not in settings.registered_player:
                 # await msg.delete()
                 return
             player = settings.registered_player[msg.author.id]
             if not settings.allowed:
-                if await self.bot.is_owner(msg.author):  # type: ignore
-                    return
+                # if await self.bot.is_owner(msg.author):  # type: ignore
+                #     return
                 # await msg.delete()
                 return settings.eliminate_player(player.author)
 
