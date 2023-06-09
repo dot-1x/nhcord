@@ -54,8 +54,6 @@ class MinigamesCog(AdminCog):
         channel = msg.channel.id
         if self.rg_game and channel in self.rg_game:
             settings = self.rg_game[channel]
-            if msg.content.startswith("."):
-                return
             if await self.bot.is_owner(msg.author):  # type: ignore
                 return
             if msg.author.id not in settings.registered_player:
@@ -298,7 +296,7 @@ class MinigamesCog(AdminCog):
             raise ValueError("base rg game settings is not found!")
         if settings.base.is_done:
             return await ctx.reply("Game is done!")
-        settings.reset_turn()
+        # settings.reset_turn()
         signal = choice([True, False])
         settings.allowed = signal
         await ctx.reply(":green_circle:" if signal else ":red_circle:")
