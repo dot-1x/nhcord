@@ -8,14 +8,20 @@ from typing import TYPE_CHECKING
 import discord
 from discord import Member
 
+from bot.logs.custom_logger import BotLogger
+
 if TYPE_CHECKING:
     from ...data.minigames import RedGreenGameSettings
+
+
+_log = BotLogger("[RG MINIGAMES]")
 
 
 @dataclass
 class RGQuestion:
     quest: str
     answer: str
+    choices: str = ""
 
 
 @dataclass
@@ -42,16 +48,23 @@ class RGPlayerData:
             return False
         return True
 
-    async def validate_turn(self, msg: discord.Message):
+    async def validate_turn(self, msg: discord.Message, question: RGQuestion | None):
+        if not question:
+            return
         if self.answered:
             emb = discord.Embed(
                 description=f"{msg.author.mention} already answered: {self.last_answer}",
                 color=discord.Color.blue(),
             )
             await msg.channel.send(embed=emb)
-            await msg.delete()
+            # await msg.delete()
         if not self.answered:
             self.last_answer = msg.content
+            if self.last_answer.lower() == question.answer.lower():
+                _log.info("%s answered correct", self.author.name)
+                self.correct += 1
+            else:
+                _log.warning("%s answered wrong", self.author.name)
             self.answered = True
 
 
@@ -79,5 +92,9 @@ class RGGameBase:
             return
         self.is_done = True
         # self.settings.allowed = False
-        emb = discord.Embed(description="**GAME OVER !!**")
+        remain = list(self.settings.registered_player.values())
+        for player in remain:
+            if player.correct < self.settings.min_correct:
+                self.settings.eliminate_player(player.author, 2)
+        emb = discord.Embed(description="**GAME OVER !!**", color=discord.Color.red())
         await self.channel.send(embed=emb)

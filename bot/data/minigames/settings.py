@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING, Dict, List, Literal, Set
 
 from discord import Colour, Embed, File, Member, Role, TextChannel, User
 
+
+from ...models.minigames.redgreen_game import RGQuestion
 from ...logs.custom_logger import BotLogger
 from ...utils.minigames import create_image_grid
 
@@ -35,8 +37,10 @@ class BaseSettings:
 class RedGreenGameSettings(BaseSettings):
     base: RGGameBase | None
     invoker: Member
+    questions: dict[str, RGQuestion]
     registered_player: Dict[int, RGPlayerData]
     channel: TextChannel
+    current_question: RGQuestion | None = None
     allowed: bool = False
     fail_player: Set[Member] = field(default_factory=set)
     loser_role: Role | None = None
@@ -44,12 +48,17 @@ class RedGreenGameSettings(BaseSettings):
     initiated: bool = False
 
     def reset_turn(self):
-        for _, player in self.registered_player.items():
+        for player in self.registered_player.values():
             player.answered = False
 
-    def eliminate_player(self, player: Member | User, afk: bool = False):
+    def eliminate_player(
+        self,
+        player: Member | User,
+        msg: Literal[0, 1, 2] = 0,
+    ):
+        elim_map = {0: "", 1: "For AFK!", 2: "For not enough correct answers"}
         emb = Embed(
-            description=f"{player.mention} *Eliminated {'For AFK' if afk else ''}*",
+            description=f"{player.mention} *Eliminated {elim_map.get(msg)}*",
             color=Colour.red(),
         )
         loop = asyncio.get_running_loop()

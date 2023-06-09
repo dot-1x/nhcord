@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import csv
+from io import StringIO
 import json
 from copy import copy
 from datetime import datetime, timedelta
@@ -20,6 +22,7 @@ from ...models.minigames import (
     RGGameBase,
     RGPlayerData,
     RunningGame,
+    RGQuestion,
 )
 from ...utils.minigames import TIMELEFT, get_member_by_role
 from .admin import AdminCog
@@ -51,22 +54,25 @@ class MinigamesCog(AdminCog):
         channel = msg.channel.id
         if self.rg_game and channel in self.rg_game:
             settings = self.rg_game[channel]
-            if await self.bot.is_owner(msg.author):  # type: ignore
+            if msg.content.startswith("."):
                 return
+            # if await self.bot.is_owner(msg.author):  # type: ignore
+            #     return
             if msg.author.id not in settings.registered_player:
-                await msg.delete()
-                print(f"player {msg.author} not in list")
+                # await msg.delete()
                 return
             player = settings.registered_player[msg.author.id]
             if not settings.allowed:
+                if await self.bot.is_owner(msg.author):  # type: ignore
+                    return
                 # await msg.delete()
                 return settings.eliminate_player(player.author)
 
             if player.is_afk():
-                return settings.eliminate_player(player.author, True)
+                return settings.eliminate_player(player.author, 1)
 
             player.afk_counter = datetime.now()  # reset the afk from player
-            await player.validate_turn(msg)
+            await player.validate_turn(msg, settings.current_question)
 
     @mg_game.command(description="Squid game - glass game")
     @option(
@@ -184,6 +190,11 @@ class MinigamesCog(AdminCog):
         description="Allowed Role to play the game",
     )
     @option(
+        name="questions",
+        type=discord.Attachment,
+        description="A csv file that containing questions",
+    )
+    @option(
         name="limit",
         type=int,
         min_value=1,
@@ -208,6 +219,7 @@ class MinigamesCog(AdminCog):
         self,
         ctx: discord.ApplicationContext,
         role: discord.Role,
+        questions: discord.Attachment,
         limit: int,
         loser_role: discord.Role | None,
         min_correct: int,
@@ -229,7 +241,7 @@ class MinigamesCog(AdminCog):
             description="There will be some questions appear on the chat"
             + "\nYou will be eliminated if:"
             + "\nYou were typing when the light is **RED**"
-            + "\nYou were typing wrong answer"
+            + "\nNot enough correct answer"
             + "\nYou were AFK for limited time",
             fields=[
                 discord.EmbedField("Players", str(len(players))),
@@ -239,10 +251,27 @@ class MinigamesCog(AdminCog):
             ],
             colour=discord.Colour.blurple(),
         )
+        content = await questions.read()
+        with StringIO(content.decode("utf-8")) as qcontent:
+            question = csv.DictReader(
+                qcontent, fieldnames=["question", "answer", "choices"], delimiter="-"
+            )
+            parsed_q: dict[str, RGQuestion] = {}
+            for quest in question:
+                parsed_q.update(
+                    {
+                        quest["question"].lower(): RGQuestion(
+                            quest["question"],
+                            quest["answer"],
+                            quest["choices"] or "No choices, guess it yourself",
+                        )
+                    }
+                )
         settings = RedGreenGameSettings(
             channel=ctx.channel,
             base=None,
             invoker=ctx.author,
+            questions=parsed_q,
             channel_id=ctx.channel_id or 0,
             registered_player=players,
             running=True,
@@ -283,3 +312,28 @@ class MinigamesCog(AdminCog):
             await settings.base.done()
         del self.rg_game[ctx.channel.id]
         await ctx.reply("Succesfully removed current running game")
+
+    @commands.command(name="rgquest")
+    async def change_quest(self, ctx: commands.Context):
+        if ctx.channel.id not in self.rg_game:
+            return await ctx.reply("Currently no running game on this channel")
+        # if not quest:
+        #     return await ctx.reply(
+        #         'A question argument must be passed, ex: `.rgquest "1 + 2 equals?"`'
+        #     )
+        settings = self.rg_game[ctx.channel.id]
+        if not settings.questions:
+            return await ctx.reply("No more questions to pick!")
+        keys = list(settings.questions)
+        to_update = settings.questions.pop(choice(keys))
+        if not to_update:
+            return await ctx.reply("question not found!")
+        settings.reset_turn()
+        settings.current_question = to_update
+        choices = to_update.choices.replace("||", "\n")
+        await ctx.reply(
+            embed=discord.Embed(
+                description=f"**{to_update.quest}**\nChoices:\n{choices}",
+                colour=discord.Colour.blurple(),
+            )
+        )

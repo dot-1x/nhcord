@@ -133,3 +133,4 @@ tests
 *.png
 .vscode
 backup
+*.csv
