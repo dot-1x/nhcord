@@ -258,8 +258,8 @@ class BridgeGameView(View):
             if kill:
                 await self.settings.assign_role("failed")
             else:
-                get_running_loop().create_task(self.settings.assign_role("winner"))
-                get_running_loop().create_task(self.settings.assign_role("loser"))
+                await self.settings.assign_role("winner")
+                await self.settings.assign_role("loser")
 
     async def start_timer(self):
         while datetime.now() < self.deadline and not self.disabled:

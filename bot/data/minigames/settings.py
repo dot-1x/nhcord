@@ -123,7 +123,7 @@ class BridgeGameSettings(BaseSettings):
         if self.loser_role and target == "loser":
             for fail in self.fail_player:
                 await fail.add_roles(self.loser_role, reason="Losing the game")  # type: ignore
-                await fail.remove_roles(self.player_role, "Losing game")  # type: ignore
+                await fail.remove_roles(self.player_role, reason="Losing game")  # type: ignore
         elif self.winner_role and target == "winner":
             for winner in self.players:
                 await winner.add_roles(
@@ -132,3 +132,4 @@ class BridgeGameSettings(BaseSettings):
         elif target == "failed" and self.loser_role:
             for player in self.registered_player:
                 await player.add_roles(self.loser_role)  # type: ignore
+                await player.remove_roles(self.player_role)  # type: ignore
