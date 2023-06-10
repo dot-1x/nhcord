@@ -320,7 +320,7 @@ class MinigamesCog(AdminCog):
         counter = 1
         groups: dict[int, list[discord.Member]] = {k + 1: [] for k in range(8)}
         for member in ctx.guild.members:
-            if member.get_role(role):
+            if member.get_role(role.id):
                 groups[counter].append(member)
                 counter += 1
                 if counter > 8:
