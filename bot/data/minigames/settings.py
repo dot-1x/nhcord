@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass, field
 from random import randint
 from typing import TYPE_CHECKING, Dict, List, Literal, Set
@@ -49,7 +48,7 @@ class RedGreenGameSettings(BaseSettings):
         for player in self.registered_player.values():
             player.answered = False
 
-    def eliminate_player(
+    async def eliminate_player(
         self,
         player: Member | User,
         msg: Literal[0, 1, 2] = 0,
@@ -59,9 +58,8 @@ class RedGreenGameSettings(BaseSettings):
             description=f"{player.mention} *Eliminated {elim_map.get(msg, '')}*",
             color=Colour.red(),
         )
-        loop = asyncio.get_running_loop()
         if self.loser_role:
-            loop.create_task(player.add_roles(self.loser_role))  # type: ignore
+            await player.add_roles(self.loser_role)  # type: ignore
         try:
             elim = self.registered_player.pop(player.id)
             # elim = self.registered_player[player.id]
@@ -69,7 +67,7 @@ class RedGreenGameSettings(BaseSettings):
             self.fail_player.add(player)  # type: ignore
             return
         self.fail_player.add(elim.author)
-        loop.create_task(self.channel.send(embed=emb))
+        await self.channel.send(embed=emb)
 
 
 @dataclass(slots=True)

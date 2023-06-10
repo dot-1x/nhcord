@@ -65,10 +65,10 @@ class MinigamesCog(AdminCog):
                 # if await self.bot.is_owner(msg.author):  # type: ignore
                 #     return
                 # await msg.delete()
-                return settings.eliminate_player(player.author)
+                return await settings.eliminate_player(player.author)
 
-            if player.is_afk():
-                return settings.eliminate_player(player.author, 1)
+            # if player.is_afk():
+            #     return settings.eliminate_player(player.author, 1)
 
             player.afk_counter = datetime.now()  # reset the afk from player
             await player.validate_turn(msg, settings.current_question)

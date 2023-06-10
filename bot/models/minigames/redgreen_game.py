@@ -95,6 +95,6 @@ class RGGameBase:
         remain = list(self.settings.registered_player.values())
         for player in remain:
             if player.correct < self.settings.min_correct:
-                self.settings.eliminate_player(player.author, 2)
+                await self.settings.eliminate_player(player.author, 2)
         emb = discord.Embed(description="**GAME OVER !!**", color=discord.Color.red())
         await self.channel.send(embed=emb)
