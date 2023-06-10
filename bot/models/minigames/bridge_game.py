@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from asyncio import get_running_loop
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional, Sequence
 
@@ -10,6 +9,8 @@ from discord import Colour, Embed, Interaction, Message, TextChannel, WebhookMes
 from discord.ui import Button, View
 
 from bot.logs.custom_logger import BotLogger
+
+# from bot.utils.check import is_admin
 
 from ...utils.minigames.minigames_utils import TIMELEFT
 
@@ -153,6 +154,16 @@ class BridgeGameView(View):
         self.childs.append(switch_btn)  # type: ignore
         self.add_item(switch_btn)
 
+    # @discord.ui.button(label="End Game", style=discord.ButtonStyle.danger, row=3)
+    # async def end_game(self, _, interaction: Interaction):
+    #     if not isinstance(interaction.user, discord.Member) or not is_admin(
+    #         interaction.user
+    #     ):
+    #         return interaction.response.send_message(
+    #             "This button is not for you", ephemeral=True
+    #         )
+    #     await self.done()
+
     async def check_switch(self, interaction: Interaction):
         if interaction.user != self.settings.turn:
             return await interaction.response.send_message(
@@ -240,11 +251,7 @@ class BridgeGameView(View):
             emb = Embed(title="Final Stats", fields=fields, colour=Colour.teal())
             emb.set_thumbnail(url=THUMBNAIL_URL)
             await self.msg.edit(view=self)
-            player = (
-                self.settings.winner_role.mention
-                if self.settings.winner_role
-                else "Player"
-            )
+            player = self.settings.player_role.mention
             await self.msg.reply(
                 content=TIMELEFT.format(time=round(self.deadline.timestamp()))
                 + (
