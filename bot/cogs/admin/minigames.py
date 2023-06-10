@@ -7,6 +7,7 @@ import json
 from copy import copy
 from datetime import datetime, timedelta
 from random import choice, shuffle
+from string import ascii_uppercase
 from typing import TYPE_CHECKING, Dict, List
 
 import discord
@@ -261,7 +262,7 @@ class MinigamesCog(AdminCog):
                         quest["question"].lower(): RGQuestion(
                             quest["question"],
                             quest["answer"],
-                            quest["choices"] or "No choices, guess it yourself",
+                            quest["choices"] or "No choices, guess it yourself (essay)",
                         )
                     }
                 )
@@ -322,16 +323,37 @@ class MinigamesCog(AdminCog):
         settings = self.rg_game[ctx.channel.id]
         if not settings.questions:
             return await ctx.reply("No more questions to pick!")
+        if settings.current_question:
+            question = settings.current_question
+            try:
+                idx = ascii_uppercase.index(question.answer)
+            except ValueError:
+                idx = None
+            answer = question.choices.split("||")[idx] if idx is not None else ""
+            await ctx.reply(
+                embed=discord.Embed(
+                    description=f"Previous answer was: **{question.answer}. {answer}**",
+                    colour=discord.Color.dark_orange(),
+                )
+            )
+            await asyncio.sleep(5)
         keys = list(settings.questions)
         to_update = settings.questions.pop(choice(keys))
         if not to_update:
             return await ctx.reply("question not found!")
         settings.reset_turn()
         settings.current_question = to_update
-        choices = to_update.choices.replace("||", "\n")
+        choices = (
+            "\n".join(
+                f"{ascii_uppercase[idx]}. {choice}"
+                for idx, choice in enumerate(to_update.choices.split("||"))
+            )
+            if to_update.choices.find("||") > 0
+            else to_update.choices
+        )
         await ctx.reply(
             embed=discord.Embed(
-                description=f"**{to_update.quest}**\nChoices:\n{choices}",
+                description=f"**{to_update.quest}**\n{choices}",
                 colour=discord.Colour.blurple(),
             )
         )

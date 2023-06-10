@@ -8,12 +8,11 @@ from typing import TYPE_CHECKING, Dict, List, Literal, Set
 from discord import Colour, Embed, File, Member, Role, TextChannel, User
 
 
-from ...models.minigames.redgreen_game import RGQuestion
 from ...logs.custom_logger import BotLogger
 from ...utils.minigames import create_image_grid
 
 if TYPE_CHECKING:
-    from ...models.minigames import RGGameBase, RGPlayerData
+    from ...models.minigames import RGGameBase, RGPlayerData, RGQuestion
 
 GLASS_GAME_FORMATTER = "Segments: {}\n{}'s turn!\nWhich bridge is SAFE?!!!"
 THUMBNAIL_URL = (
@@ -37,7 +36,7 @@ class BaseSettings:
 class RedGreenGameSettings(BaseSettings):
     base: RGGameBase | None
     invoker: Member
-    questions: dict[str, RGQuestion]
+    questions: Dict[str, RGQuestion]
     registered_player: Dict[int, RGPlayerData]
     channel: TextChannel
     current_question: RGQuestion | None = None
@@ -45,7 +44,6 @@ class RedGreenGameSettings(BaseSettings):
     fail_player: Set[Member] = field(default_factory=set)
     loser_role: Role | None = None
     min_correct: int = 5
-    initiated: bool = False
 
     def reset_turn(self):
         for player in self.registered_player.values():
@@ -58,7 +56,7 @@ class RedGreenGameSettings(BaseSettings):
     ):
         elim_map = {0: "", 1: "For AFK!", 2: "For not enough correct answers"}
         emb = Embed(
-            description=f"{player.mention} *Eliminated {elim_map.get(msg)}*",
+            description=f"{player.mention} *Eliminated {elim_map.get(msg, '')}*",
             color=Colour.red(),
         )
         loop = asyncio.get_running_loop()

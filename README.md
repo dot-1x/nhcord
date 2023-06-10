@@ -1,1 +1,1 @@
-# Minigames Bot for Ninja Heroes Discord
+# Bot for NH: New Era Discord

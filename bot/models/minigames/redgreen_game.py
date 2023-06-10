@@ -51,21 +51,21 @@ class RGPlayerData:
     async def validate_turn(self, msg: discord.Message, question: RGQuestion | None):
         if not question:
             return
-        if self.answered:
-            emb = discord.Embed(
-                description=f"{msg.author.mention} already answered: {self.last_answer}",
-                color=discord.Color.blue(),
-            )
-            await msg.channel.send(embed=emb)
-            # await msg.delete()
-        if not self.answered:
-            self.last_answer = msg.content
-            if self.last_answer.lower() == question.answer.lower():
-                _log.info("%s answered correct", self.author.name)
-                self.correct += 1
-            else:
-                _log.warning("%s answered wrong", self.author.name)
-            self.answered = True
+        # if self.answered:
+        #     emb = discord.Embed(
+        #         description=f"{msg.author.mention} already answered: {self.last_answer}",
+        #         color=discord.Color.blue(),
+        #     )
+        #     await msg.channel.send(embed=emb)
+        # await msg.delete()
+        # if not self.answered:
+        self.last_answer = msg.content
+        if self.last_answer.lower() == question.answer.lower():
+            _log.info("%s answered correct", self.author.name)
+            self.correct += 1
+        else:
+            _log.warning("%s answered wrong", self.author.name)
+        self.answered = True
 
 
 class RGGameBase:
