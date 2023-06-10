@@ -48,6 +48,8 @@ class BridgeGameButton(Button["BridgeGameView"]):
     async def callback(self, interaction: Interaction):
         if not self.view:
             raise ValueError("View not found!")
+        if not isinstance(interaction.channel, discord.TextChannel):
+            return
         if (
             isinstance(interaction.user, discord.Member)
             and interaction.user != self.view.settings.turn
@@ -61,6 +63,11 @@ class BridgeGameButton(Button["BridgeGameView"]):
             await self.view.new_segment()
         else:
             await interaction.response.send_message("You have failed!", ephemeral=True)
+            await interaction.channel.send(
+                embed=discord.Embed(
+                    description=f"*{self.view.settings.turn.mention} Eliminated*"
+                )
+            )
             await self.view.switch_turn(int(self.label or 1) - 1)
 
 

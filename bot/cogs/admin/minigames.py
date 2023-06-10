@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import csv
-from io import StringIO
+from io import BytesIO, StringIO
 import json
 from copy import copy
 from datetime import datetime, timedelta
@@ -155,6 +155,7 @@ class MinigamesCog(AdminCog):
         await ctx.send(f"{role.mention} Prepare your game!", embed=detail_embed)
         shuffle(players)
         settings = BridgeGameSettings(
+            player_role=role,
             channel_id=ctx.channel_id or 0,
             turn=players.pop(0),
             segments=segments,
@@ -310,7 +311,7 @@ class MinigamesCog(AdminCog):
                 counter += 1
         await ctx.respond(f"Succesfully asigned role {role} to {counter} members")
 
-    @mg_game.command()
+    @mg_game.command(description="divide all member on target role into 8 group")
     @option(name="role", type=discord.Role, description="role to divide")
     async def divide_group(
         self,
@@ -331,6 +332,26 @@ class MinigamesCog(AdminCog):
             for idx, items in groups.items()
         ]
         await ctx.respond("\n".join(msgs))
+
+    # @mg_game.command(description="pair all member on target role")
+    # @option(name="role", type=discord.Role, description="role to divide")
+    # async def pair_two(
+    #     self,
+    #     ctx: discord.ApplicationContext,
+    #     role: discord.Role,
+    # ):
+    #     found = [member for member in ctx.guild.members if member.get_role(role.id)]
+    #     divide = round(len(found) / 2)
+    #     shuffle(found)
+    #     first, second = found[:divide], found[divide:]
+    #     popped = second.pop() if len(second) % 2 else None
+    #     with open("paired.txt", "w", encoding="utf-8") as text:
+    #         for idx, (one, two) in enumerate(zip(first, second)):
+    #             text.writelines(f"{idx}. {one.mention} vs {two.mention}\n")
+    #         file = discord.File(text, filename="paired.txt")
+    #         await ctx.respond(file=file)
+    #     if popped:
+    #         await ctx.send(f"{popped.mention} left unpaired")
 
     @commands.command(name="rgsignal")
     async def set_rg_signal(self, ctx: commands.Context):
