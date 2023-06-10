@@ -298,14 +298,14 @@ class MinigamesCog(AdminCog):
         self,
         ctx: discord.ApplicationContext,
         role: discord.Role,
-        except_: discord.Role,
-        which: discord.Role,
+        exception: discord.Role,
+        which_role: discord.Role,
     ):
         counter = 0
         for member in ctx.guild.members:
-            if member.get_role(except_):
+            if member.get_role(exception):
                 continue
-            if member.get_role(which):
+            if member.get_role(which_role):
                 await member.add_roles(role)
                 counter += 1
         await ctx.respond(f"Succesfully asigned role {role} to {counter} members")
