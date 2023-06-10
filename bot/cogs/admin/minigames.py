@@ -60,6 +60,8 @@ class MinigamesCog(AdminCog):
             if msg.author.id not in settings.registered_player:
                 # await msg.delete()
                 return
+            if settings.base and settings.base.is_done:
+                return
             player = settings.registered_player[msg.author.id]
             if not settings.allowed:
                 # if await self.bot.is_owner(msg.author):  # type: ignore
@@ -287,6 +289,44 @@ class MinigamesCog(AdminCog):
             embed=emb,
         )
         self.bot.loop.create_task(game.start_timer())
+
+    @mg_game.command()
+    @option(name="role", type=discord.Role, description="role to assign")
+    @option(name="exception", type=discord.Role, description="role to skip")
+    @option(name="which_role", type=discord.Role, description="User that has this role")
+    async def assign_role(
+        self,
+        ctx: discord.ApplicationContext,
+        role: discord.Role,
+        except_: discord.Role,
+        which: discord.Role,
+    ):
+        counter = 0
+        for member in ctx.guild.members:
+            if member.get_role(except_):
+                continue
+            if member.get_role(which):
+                await member.add_roles(role)
+                counter += 1
+        await ctx.respond(f"Succesfully asigned role {role} to {counter} members")
+
+    @mg_game.command()
+    @option(name="role", type=discord.Role, description="role to divide")
+    async def divide_group(
+        self,
+        ctx: discord.ApplicationContext,
+        role: discord.Role,
+    ):
+        counter = 1
+        groups: dict[int, list[discord.Member]] = {k + 1: [] for k in range(8)}
+        for member in ctx.guild.members:
+            if member.get_role(role):
+                groups[counter].append(member)
+                counter += 1
+                if counter > 8:
+                    counter = 0
+                continue
+        await ctx.respond(f"{groups}")
 
     @commands.command(name="rgsignal")
     async def set_rg_signal(self, ctx: commands.Context):
