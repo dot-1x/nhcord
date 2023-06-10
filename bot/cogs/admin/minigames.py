@@ -324,7 +324,7 @@ class MinigamesCog(AdminCog):
                 groups[counter].append(member)
                 counter += 1
                 if counter > 8:
-                    counter = 0
+                    counter = 1
                 continue
         await ctx.respond(f"{groups}")
 
