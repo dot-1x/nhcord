@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import csv
-from io import BytesIO, StringIO
+from io import StringIO
 import json
 from copy import copy
 from datetime import datetime, timedelta

@@ -82,17 +82,16 @@ class BridgeGameSettings(BaseSettings):
     loser_role: Role | None = None
     winner_role: Role | None = None
     segment: int = 1
-    revealed_bridge: list[int] = field(default_factory=list)
+    revealed_bridge: Set[int] = field(default_factory=set)
 
     def move_segments(self):
         self.safe_point = randint(0, 3)
-        print(self.safe_point)
-        self.revealed_bridge = []
+        _log.info("Safe point is %i", self.safe_point)
+        self.revealed_bridge = set()
 
     async def new_turn(self, safe_pos: int | None):
         if safe_pos is not None:
-            if safe_pos not in self.revealed_bridge:
-                self.revealed_bridge.append(safe_pos)
+            self.revealed_bridge.add(safe_pos)
             _log.info("Player %s eliminated from glass game", self.turn.name)
             self.fail_player.append(self.turn)
             await self.turn.remove_roles(self.player_role)  # type: ignore
@@ -107,8 +106,8 @@ class BridgeGameSettings(BaseSettings):
 
     def generate_image(self, reveal: bool = False):
         if reveal:
-            self.revealed_bridge = list(range(4))
-        img = create_image_grid(self.revealed_bridge, self.safe_point)
+            self.revealed_bridge = set(range(4))
+        img = create_image_grid(list(self.revealed_bridge), self.safe_point)
         img.save("bridgechoose.png")
         img = File("bridgechoose.png", "bridgechoose.png")
         embed = Embed(

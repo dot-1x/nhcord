@@ -58,15 +58,15 @@ class BridgeGameButton(Button["BridgeGameView"]):
             return await interaction.response.send_message(
                 "This button is not for you!", ephemeral=True
             )
+        turn = self.view.settings.turn
+        _log.info("%s Pressed %i", turn.name, int(self.label or 1))
         if self.view.settings.safe_point == int(self.label or 1) - 1:
             await interaction.response.send_message("You have success!", ephemeral=True)
             await self.view.new_segment()
         else:
             await interaction.response.send_message("You have failed!", ephemeral=True)
             await interaction.channel.send(
-                embed=discord.Embed(
-                    description=f"*{self.view.settings.turn.mention} Eliminated*"
-                )
+                embed=discord.Embed(description=f"*{turn.mention} Eliminated*")
             )
             await self.view.switch_turn(int(self.label or 1) - 1)
 
