@@ -326,7 +326,11 @@ class MinigamesCog(AdminCog):
                 if counter > 8:
                     counter = 1
                 continue
-        await ctx.respond(f"{groups}")
+        msgs = [
+            f"{idx}: " + ", ".join(mem.mention for mem in items)
+            for idx, items in groups.items()
+        ]
+        await ctx.respond("\n".join(msgs))
 
     @commands.command(name="rgsignal")
     async def set_rg_signal(self, ctx: commands.Context):
