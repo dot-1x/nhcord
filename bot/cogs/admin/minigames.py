@@ -77,11 +77,6 @@ class MinigamesCog(AdminCog):
 
     @mg_game.command(description="Squid game - glass game")
     @option(
-        name="role",
-        type=discord.Role,
-        description="Allowed Role to play the game",
-    )
-    @option(
         name="segments",
         type=int,
         description="Specify how many segments until the game is over",
@@ -92,6 +87,13 @@ class MinigamesCog(AdminCog):
         type=int,
         description="Specify the time limit until the game is over (in minutes)",
         min_value=1,
+    )
+    @option(
+        name="role",
+        type=discord.Role,
+        description="Allowed Role to play the game",
+        required=False,
+        default=None,
     )
     @option(
         name="loser_role",
@@ -110,9 +112,9 @@ class MinigamesCog(AdminCog):
     async def glass_game(
         self,
         ctx: discord.ApplicationContext,
-        role: discord.Role,
         limit: int,
         segments: int,
+        role: discord.Role | None = None,
         loser_role: discord.Role | None = None,
         winner_role: discord.Role | None = None,
     ):
@@ -131,7 +133,11 @@ class MinigamesCog(AdminCog):
         if timeout:
             _log.info("Timed out, game canceled")
             return
-        players = [player for player in selected.values]
+        players = (
+            list(selected.values)
+            if not role
+            else [member for member in selected.values if member.get_role(role.id)]
+        )
         if not players:
             return await ctx.respond("No players were found!", ephemeral=True)
         detail_embed = discord.Embed(
@@ -152,7 +158,9 @@ class MinigamesCog(AdminCog):
                 discord.EmbedField("Winner role", str(winner_role)),
             ],
         )
-        await ctx.send(f"{role.mention} Prepare your game!", embed=detail_embed)
+        await ctx.send(
+            f"{role.mention if role else ''} Prepare your game!", embed=detail_embed
+        )
         shuffle(players)
         settings = BridgeGameSettings(
             player_role=role,

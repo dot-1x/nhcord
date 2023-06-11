@@ -72,7 +72,7 @@ class RedGreenGameSettings(BaseSettings):
 
 @dataclass(slots=True)
 class BridgeGameSettings(BaseSettings):
-    player_role: Role
+    player_role: Role | None
     turn: Member
     segments: int
     players: List[Member]
@@ -94,7 +94,6 @@ class BridgeGameSettings(BaseSettings):
             self.revealed_bridge.add(safe_pos)
             _log.info("Player %s eliminated from glass game", self.turn.name)
             self.fail_player.append(self.turn)
-            await self.turn.remove_roles(self.player_role)  # type: ignore
         if self.loser_role:
             await self.turn.add_roles(self.loser_role)  # type: ignore
         if not self.players:
@@ -123,7 +122,6 @@ class BridgeGameSettings(BaseSettings):
         if self.loser_role and target == "loser":
             for fail in self.fail_player:
                 await fail.add_roles(self.loser_role, reason="Losing the game")  # type: ignore
-                await fail.remove_roles(self.player_role, reason="Losing game")  # type: ignore
         elif self.winner_role and target == "winner":
             for winner in self.players:
                 await winner.add_roles(
@@ -132,4 +130,3 @@ class BridgeGameSettings(BaseSettings):
         elif target == "failed" and self.loser_role:
             for player in self.registered_player:
                 await player.add_roles(self.loser_role)  # type: ignore
-                await player.remove_roles(self.player_role)  # type: ignore

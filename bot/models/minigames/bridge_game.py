@@ -251,7 +251,11 @@ class BridgeGameView(View):
             emb = Embed(title="Final Stats", fields=fields, colour=Colour.teal())
             emb.set_thumbnail(url=THUMBNAIL_URL)
             await self.msg.edit(view=self)
-            player = self.settings.player_role.mention
+            player = (
+                self.settings.player_role.mention
+                if self.settings.player_role
+                else "player"
+            )
             await self.msg.reply(
                 content=TIMELEFT.format(time=round(self.deadline.timestamp()))
                 + (
