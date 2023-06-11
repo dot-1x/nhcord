@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import secrets
 import traceback
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from discord import CheckFailure, Intents
 from discord.commands import ApplicationContext
@@ -9,8 +11,12 @@ from discord.ext import commands
 from discord.ext.commands import errors
 from discord.ext.commands.context import Context
 
+
 from .config import CONFIG
 from .logs import BotLogger
+
+if TYPE_CHECKING:
+    from .models.modmail.ticket import Ticket
 
 
 class NhCord(commands.Bot):  # pylint: disable=R0901
@@ -20,6 +26,7 @@ class NhCord(commands.Bot):  # pylint: disable=R0901
         intent.guilds = True
         intent.message_content = True
         intent.guild_messages = True
+        intent.dm_messages = True
         super().__init__(
             CONFIG["prefix"],
             intents=intent,
@@ -27,8 +34,10 @@ class NhCord(commands.Bot):  # pylint: disable=R0901
             *args,
             **options,
         )
+        self.tickets: dict[int, Ticket] = {}
         self.log = BotLogger("[BOT]")
         self.load_extension(".cogs", package="bot", recursive=False, store=False)
+        self.load_extension(".events", package="bot", recursive=False, store=False)
 
     def log_exc(self, ctx: ApplicationContext | Context, exception: Exception):
         err_id = secrets.token_hex(4).upper()
