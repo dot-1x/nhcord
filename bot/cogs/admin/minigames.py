@@ -131,7 +131,7 @@ class MinigamesCog(AdminCog):
         if timeout:
             _log.info("Timed out, game canceled")
             return
-        players = [player for player in selected.values if player.get_role(role.id)]
+        players = [player for player in selected.values]
         if not players:
             return await ctx.respond("No players were found!", ephemeral=True)
         detail_embed = discord.Embed(
