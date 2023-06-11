@@ -32,20 +32,13 @@ class AdminCog(discord.Cog):
     ) -> None:
         if isinstance(error, discord.CheckFailure):
             _log.warning("Check failed invoked by %s", ctx.author)
-        else:
-            raise error
+        raise error
 
     def cog_check(self, ctx: discord.ApplicationContext | commands.Context):
         if not is_admin(ctx.author):
-            self.handle_err_message(ctx, "You cannot perform this action")
             return False
         if isinstance(ctx, discord.ApplicationContext):
-            opts = ctx.selected_options
-            if (
-                opts
-                and any(opt for opt in opts if opt.get("name") == "loser_role")
-                and not ctx.guild.me.guild_permissions.manage_roles
-            ):
+            if not ctx.guild.me.guild_permissions.manage_roles:
                 self.handle_err_message(ctx, "Bot needs a permission to change role!")
                 return False
         return True

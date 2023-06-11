@@ -37,7 +37,6 @@ class NhCord(commands.Bot):  # pylint: disable=R0901
         self.tickets: dict[int, Ticket] = {}
         self.log = BotLogger("[BOT]")
         self.load_extension(".cogs", package="bot", recursive=False, store=False)
-        self.load_extension(".events", package="bot", recursive=False, store=False)
 
     def log_exc(self, ctx: ApplicationContext | Context, exception: Exception):
         err_id = secrets.token_hex(4).upper()
@@ -60,15 +59,17 @@ class NhCord(commands.Bot):  # pylint: disable=R0901
         self, context: ApplicationContext, exception: DiscordException
     ):
         if isinstance(exception, CheckFailure):
-            return
+            return await context.respond(
+                "You cannot perform this action", ephemeral=True
+            )
         self.log.critical("An Error Occured!")
         self.log_exc(context, exception)
 
     async def on_command_error(self, context: Context, exception: errors.CommandError):
         if isinstance(exception, CheckFailure):
-            return
+            return await context.reply("You cannot perform this action")
         if isinstance(exception, commands.CommandNotFound):
-            return await context.reply("Command is not found!")
+            return await context.reply("Command not found!")
         self.log.critical("An Error Occured!")
         self.log_exc(context, exception)
 
@@ -80,4 +81,5 @@ class NhCord(commands.Bot):  # pylint: disable=R0901
             traceback.print_exc(file=excfile)
 
     async def on_ready(self):
+        self.log.info("Logged in as %s", self.user)
         self.log.info("Bot is ready!")

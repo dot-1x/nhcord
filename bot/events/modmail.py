@@ -1,15 +1,27 @@
 from __future__ import annotations
+import asyncio
+import secrets
 
 from typing import TYPE_CHECKING
-from discord import Cog
+from discord import Cog, PermissionOverwrite
 import discord
 from discord.interactions import Interaction
+from discord.ext import commands
 
+from bot.models.modmail.ticket import Ticket
+from bot.utils.check import is_admin
 
 if TYPE_CHECKING:
     from bot.bot import NhCord
 
 CREATE_TICKET_MSG = "Hello {author}, to contact our discord staff, please fill form by clicking button below"
+ALLOW_READ = PermissionOverwrite(
+    send_messages=False, read_messages=True, read_message_history=True
+)
+ALLOW_SEND = PermissionOverwrite(
+    send_messages=True, read_messages=True, read_message_history=True
+)
+DISALLOW_READ = discord.PermissionOverwrite(read_messages=False)
 
 
 class TicketModal(discord.ui.Modal):
@@ -30,14 +42,44 @@ class TicketModal(discord.ui.Modal):
         self.bot = bot
 
     async def callback(self, interaction: Interaction):
+        if not isinstance(interaction.user, discord.User):
+            return
+        channel = await self.create_ticket(interaction.user)
+        if not channel:
+            return await interaction.response.send_message("Failed to create a ticket!")
         await interaction.response.send_message(
-            "Thank you for your ticket, our staff will be in respond as soon as possible"
+            content=f"Ticket has been submitted at: {channel.mention} "
         )
         if self.msg:
-            await self.msg.edit(content="Ticket has been submitted", view=None)
+            await self.msg.edit(
+                content="Thank you for your ticket, our staff will be responding as soon as possible",
+                view=None,
+            )
 
-    async def create_ticket(self):
-        ...
+    async def create_ticket(self, user: discord.User):
+        guild = self.bot.get_guild(1103204627484250122)
+        if not guild:
+            return None
+        target = guild.get_member(user.id)
+        if not target:
+            return None
+        perms = {
+            target: ALLOW_SEND,
+            guild.default_role: DISALLOW_READ,
+        }
+        channel = await guild.create_text_channel(str(user.id), overwrites=perms)  # type: ignore
+        self.bot.tickets.update(
+            {
+                user.id: Ticket(
+                    secrets.token_hex(4),
+                    user,
+                    self.ticket_title.value,  # type: ignore
+                    self.content.value,  # type: ignore
+                    channel,
+                )
+            }
+        )
+        return channel
 
 
 class TicketView(discord.ui.View):
@@ -74,5 +116,31 @@ class ModMail(Cog):
             view=TicketView(self.bot),
         )
 
+    def cog_check(self, ctx: discord.ApplicationContext | commands.Context):
+        if not is_admin(ctx.author):
+            return False
+        return True
+
     def is_registered(self, ids: int):
         return self.tickets.get(ids)
+
+    async def delete_ticket(self, ctx: commands.Context):
+        try:
+            ticket_id = int(ctx.channel.name)
+        except ValueError:
+            return await ctx.reply("No ticket found!")
+        ticket = self.tickets.get(ticket_id)
+        if not ticket:
+            return await ctx.reply("No ticket found!")
+        await ticket.ticket_channel.set_permissions(ticket.author, ALLOW_READ)
+        await ctx.reply(f"Ticket by {ticket.author} ended!")
+        del self.tickets[ticket_id]
+
+    @commands.command("endticket")
+    @commands.guild_only()
+    async def end_ticket(self, ctx: commands.Context, delete: str = ""):
+        await self.delete_ticket(ctx)
+        if delete.lower() == "delete":
+            await ctx.reply("Deleting this channel in 1 minute")
+            await asyncio.sleep(60)
+            await ctx.channel.delete()
