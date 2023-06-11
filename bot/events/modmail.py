@@ -14,7 +14,8 @@ from bot.utils.check import is_admin
 if TYPE_CHECKING:
     from bot.bot import NhCord
 
-CREATE_TICKET_MSG = "Hello {author}, to contact our discord staff, please fill form by clicking button below"
+CREATE_TICKET_MSG = "Hello {author}, to contact our discord staff,\
+please fill form by clicking button below"
 ALLOW_READ = PermissionOverwrite(
     send_messages=False, read_messages=True, read_message_history=True
 )

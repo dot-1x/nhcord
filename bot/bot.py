@@ -37,6 +37,7 @@ class NhCord(commands.Bot):  # pylint: disable=R0901
         self.tickets: dict[int, Ticket] = {}
         self.log = BotLogger("[BOT]")
         self.load_extension(".cogs", package="bot", recursive=False, store=False)
+        self.load_extension(".events", package="bot", recursive=False, store=False)
 
     def log_exc(self, ctx: ApplicationContext | Context, exception: Exception):
         err_id = secrets.token_hex(4).upper()
