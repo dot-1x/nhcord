@@ -128,6 +128,7 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# misc
 tests
 *.jpg
 *.png
@@ -135,3 +136,4 @@ tests
 backup
 *.csv
 *.txt
+debug.py

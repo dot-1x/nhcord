@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
 
 import discord
 
@@ -12,3 +13,4 @@ class Ticket:
     ticket_channel: discord.TextChannel
 
     is_done: bool = False
+    created_at: datetime = field(default=datetime.now())

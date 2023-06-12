@@ -4,13 +4,13 @@ import secrets
 import traceback
 from typing import TYPE_CHECKING, Any
 
-from discord import CheckFailure, Intents
+import discord
+from discord import Intents
 from discord.commands import ApplicationContext
 from discord.errors import DiscordException
 from discord.ext import commands
 from discord.ext.commands import errors
 from discord.ext.commands.context import Context
-
 
 from .config import CONFIG
 from .logs import BotLogger
@@ -59,7 +59,7 @@ class NhCord(commands.Bot):  # pylint: disable=R0901
     async def on_application_command_error(
         self, context: ApplicationContext, exception: DiscordException
     ):
-        if isinstance(exception, CheckFailure):
+        if isinstance(exception, discord.CheckFailure):
             return await context.respond(
                 "You cannot perform this action", ephemeral=True
             )
@@ -67,7 +67,7 @@ class NhCord(commands.Bot):  # pylint: disable=R0901
         self.log_exc(context, exception)
 
     async def on_command_error(self, context: Context, exception: errors.CommandError):
-        if isinstance(exception, CheckFailure):
+        if isinstance(exception, commands.CheckFailure):
             return await context.reply("You cannot perform this action")
         if isinstance(exception, commands.CommandNotFound):
             return await context.reply("Command not found!")
@@ -82,5 +82,6 @@ class NhCord(commands.Bot):  # pylint: disable=R0901
             traceback.print_exc(file=excfile)
 
     async def on_ready(self):
+        await self.change_presence(activity=discord.Game(name="NH: New Era"))
         self.log.info("Logged in as %s", self.user)
         self.log.info("Bot is ready!")

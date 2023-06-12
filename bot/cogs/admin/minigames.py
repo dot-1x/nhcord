@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import csv
-from io import StringIO
 import json
 from copy import copy
 from datetime import datetime, timedelta
+from io import StringIO
 from random import choice, shuffle
 from string import ascii_uppercase
 from typing import TYPE_CHECKING, Dict, List
@@ -14,17 +14,10 @@ import discord
 from discord import Colour, option
 from discord.ext import commands
 
-
-from ...logs.custom_logger import BotLogger
 from ...data.minigames import BridgeGameSettings, RedGreenGameSettings
-from ...models.minigames import (
-    BridgeGameChoose,
-    BridgeGameView,
-    RGGameBase,
-    RGPlayerData,
-    RunningGame,
-    RGQuestion,
-)
+from ...logs.custom_logger import BotLogger
+from ...models.minigames import (BridgeGameChoose, BridgeGameView, RGGameBase,
+                                 RGPlayerData, RGQuestion, RunningGame)
 from ...utils.minigames import TIMELEFT, get_member_by_role
 from .admin import AdminCog
 

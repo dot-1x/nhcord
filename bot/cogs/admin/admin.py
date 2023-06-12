@@ -8,6 +8,8 @@ from discord.ext import commands
 from bot.logs.custom_logger import BotLogger
 from bot.utils.check import is_admin
 
+from ...exceptions import RequiredPermissionError
+
 if TYPE_CHECKING:
     from bot.bot import NhCord
 
@@ -30,8 +32,9 @@ class AdminCog(discord.Cog):
     async def cog_command_error(
         self, ctx: discord.ApplicationContext, error: Exception
     ) -> None:
-        if isinstance(error, discord.CheckFailure):
+        if isinstance(error, (discord.CheckFailure, commands.CheckFailure)):
             _log.warning("Check failed invoked by %s", ctx.author)
+            return
         raise error
 
     def cog_check(self, ctx: discord.ApplicationContext | commands.Context):
@@ -40,5 +43,5 @@ class AdminCog(discord.Cog):
         if isinstance(ctx, discord.ApplicationContext):
             if not ctx.guild.me.guild_permissions.manage_roles:
                 self.handle_err_message(ctx, "Bot needs a permission to change role!")
-                return False
+                raise RequiredPermissionError
         return True

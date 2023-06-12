@@ -7,6 +7,7 @@ __all__ = ("CONFIG",)
 class TConfig(TypedDict):
     prefix: str
     owner_ids: list[int]
+    guild: int
 
 
 with open("config.json", "rb") as config_f:

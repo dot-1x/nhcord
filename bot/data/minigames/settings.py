@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Dict, List, Literal, Set
 
 from discord import Colour, Embed, File, Member, Role, TextChannel, User
 
-
 from ...logs.custom_logger import BotLogger
 from ...utils.minigames import create_image_grid
 

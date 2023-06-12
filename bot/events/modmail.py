@@ -1,18 +1,20 @@
 from __future__ import annotations
+
 import asyncio
 import secrets
-
 from typing import TYPE_CHECKING
-from discord import Cog, PermissionOverwrite
-import discord
-from discord.interactions import Interaction
-from discord.ext import commands
 
-from bot.models.modmail.ticket import Ticket
-from bot.utils.check import is_admin
+import discord
+from discord import Cog, PermissionOverwrite
+from discord.ext import commands
+from discord.interactions import Interaction
+
+from ..config import CONFIG
+from ..models.modmail.ticket import Ticket
+from ..utils.check import is_admin
 
 if TYPE_CHECKING:
-    from bot.bot import NhCord
+    from ..bot import NhCord
 
 CREATE_TICKET_MSG = "Hello {author}, to contact our discord staff,\
 please fill form by clicking button below"
@@ -53,12 +55,12 @@ class TicketModal(discord.ui.Modal):
         )
         if self.msg:
             await self.msg.edit(
-                content="Thank you for your ticket, our staff will be responding as soon as possible",
+                content="Thank you for your ticket, staff will be responding as soon as possible",
                 view=None,
             )
 
     async def create_ticket(self, user: discord.User):
-        guild = self.bot.get_guild(1103204627484250122)
+        guild = self.bot.get_guild(CONFIG["guild"])
         if not guild:
             return None
         target = guild.get_member(user.id)
@@ -133,7 +135,9 @@ class ModMail(Cog):
         ticket = self.tickets.get(ticket_id)
         if not ticket:
             return await ctx.reply("No ticket found!")
-        await ticket.ticket_channel.set_permissions(ticket.author, ALLOW_READ)
+        await ticket.ticket_channel.set_permissions(
+            target=ticket.author, overwrite=ALLOW_READ
+        )
         await ctx.reply(f"Ticket by {ticket.author} ended!")
         del self.tickets[ticket_id]
 

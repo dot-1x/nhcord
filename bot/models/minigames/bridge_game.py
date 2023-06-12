@@ -5,14 +5,16 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Optional, Sequence
 
 import discord
-from discord import Colour, Embed, Interaction, Message, TextChannel, WebhookMessage
+from discord import (Colour, Embed, Interaction, Message, TextChannel,
+                     WebhookMessage)
 from discord.ui import Button, View
 
 from bot.logs.custom_logger import BotLogger
 
+from ...utils.minigames.minigames_utils import TIMELEFT
+
 # from bot.utils.check import is_admin
 
-from ...utils.minigames.minigames_utils import TIMELEFT
 
 if TYPE_CHECKING:
     from bot.bot import NhCord
