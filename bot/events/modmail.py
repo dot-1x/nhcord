@@ -11,7 +11,7 @@ from discord.interactions import Interaction
 
 from ..config import CONFIG
 from ..models.modmail.ticket import Ticket
-from ..utils.check import is_admin
+from ..utils.check import admin_check, is_admin
 
 if TYPE_CHECKING:
     from ..bot import NhCord
@@ -25,6 +25,18 @@ ALLOW_SEND = PermissionOverwrite(
     send_messages=True, read_messages=True, read_message_history=True
 )
 DISALLOW_READ = discord.PermissionOverwrite(read_messages=False)
+
+
+async def create_perms_channel(guild: discord.Guild, user: discord.User):
+    target = guild.get_member(user.id)
+    if not target:
+        return None
+    perms = {
+        target: ALLOW_SEND,
+        guild.default_role: DISALLOW_READ,
+    }
+    channel = await guild.create_text_channel(str(user.id), overwrites=perms)  # type: ignore
+    return channel
 
 
 class TicketModal(discord.ui.Modal):
@@ -63,14 +75,7 @@ class TicketModal(discord.ui.Modal):
         guild = self.bot.get_guild(CONFIG["guild"])
         if not guild:
             return None
-        target = guild.get_member(user.id)
-        if not target:
-            return None
-        perms = {
-            target: ALLOW_SEND,
-            guild.default_role: DISALLOW_READ,
-        }
-        channel = await guild.create_text_channel(str(user.id), overwrites=perms)  # type: ignore
+        channel = await create_perms_channel(guild, user)
         self.bot.tickets.update(
             {
                 user.id: Ticket(
@@ -100,6 +105,8 @@ class TicketView(discord.ui.View):
 class ModMail(Cog):
     def __init__(self, bot: NhCord) -> None:
         self.bot = bot
+        self.guild = bot.get_guild(CONFIG["guild"])
+        self.enabled = True
 
     @property
     def tickets(self):
@@ -107,17 +114,12 @@ class ModMail(Cog):
 
     @Cog.listener()
     async def on_message(self, msg: discord.Message):
-        if msg.author.bot or msg.guild:
+        if not self.guild:
+            self.enabled = False
+            raise ValueError("Guild not found")
+        if msg.author.bot or msg.guild or not self.enabled:
             return
-        registered = self.is_registered(msg.author.id)
-        if registered:
-            return await msg.reply(
-                f"A ticket already registered on: {registered.ticket_channel.mention}"
-            )
-        await msg.reply(
-            CREATE_TICKET_MSG.format(author=msg.author.mention),
-            view=TicketView(self.bot),
-        )
+        # ToDo: implement forward message to channel
 
     def cog_check(self, ctx: discord.ApplicationContext | commands.Context):
         if not is_admin(ctx.author):
@@ -149,3 +151,35 @@ class ModMail(Cog):
             await ctx.reply("Deleting this channel in 1 minute")
             await asyncio.sleep(60)
             await ctx.channel.delete()
+
+    @commands.command("ticekt")
+    @commands.dm_only()
+    async def start_ticket(self, ctx: commands.Context):
+        registered = self.is_registered(ctx.author.id)
+        if registered:
+            return await ctx.reply(
+                f"A ticket already registered on: {registered.ticket_channel.mention}"
+            )
+        await ctx.reply(
+            CREATE_TICKET_MSG.format(author=ctx.author.mention),
+            view=TicketView(self.bot),
+        )
+
+    @commands.command("mm enable")
+    @commands.check(admin_check)
+    async def enable_mm(self, ctx: commands.Context):
+        self.enabled = True
+        await ctx.reply("Modmail Enabled!")
+
+    @commands.command("mm disable")
+    @commands.check(admin_check)
+    async def disable_mm(self, ctx: commands.Context):
+        self.enabled = False
+        await ctx.reply("Modmail Disabled!")
+
+    @commands.command("mm status")
+    @commands.check(admin_check)
+    async def status_mm(self, ctx: commands.Context):
+        await ctx.reply(
+            f"Modmail status is {'enabled ' if self.enabled else 'disabled'}!"
+        )

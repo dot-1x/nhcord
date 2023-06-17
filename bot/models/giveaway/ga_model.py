@@ -157,6 +157,8 @@ class GiveawayView(View):
             await asyncio.sleep(10)
 
     async def roll(self, to_reroll: None | list[int] = None):
+        if to_reroll:
+            return
         if not self.message:
             raise ValueError("Message not found!")
         self.ended = True
