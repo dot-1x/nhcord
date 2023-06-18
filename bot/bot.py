@@ -16,7 +16,7 @@ from .config import CONFIG
 from .logs import BotLogger
 
 if TYPE_CHECKING:
-    from .models.modmail.ticket import Ticket
+    from .models.modmail import ActiveMail, Ticket
 
 
 class NhCord(commands.Bot):  # pylint: disable=R0901
@@ -35,6 +35,7 @@ class NhCord(commands.Bot):  # pylint: disable=R0901
             **options,
         )
         self.tickets: dict[int, Ticket] = {}
+        self.mails: dict[int, ActiveMail] = {}
         self.log = BotLogger("[BOT]")
         self.load_extension(".cogs", package="bot", recursive=False, store=False)
         self.load_extension(".events", package="bot", recursive=False, store=False)

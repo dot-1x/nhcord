@@ -14,9 +14,3 @@ class Ticket:
 
     is_done: bool = False
     created_at: datetime = field(default=datetime.now())
-
-
-@dataclass
-class Mail:
-    sender: discord.User | discord.Member
-    content: str

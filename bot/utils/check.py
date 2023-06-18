@@ -1,7 +1,6 @@
-from discord import Member
 import discord
+from discord import Member, Role
 from discord.ext import commands
-
 
 from ..config import CONFIG
 
@@ -19,9 +18,20 @@ def is_admin(user: Member):
     )
 
 
+def is_role_admin(role: Role):
+    return any(
+        (
+            role.permissions.manage_messages,
+            role.permissions.manage_channels,
+            role.permissions.manage_roles,
+            role.permissions.manage_guild,
+        )
+    )
+
+
 def admin_check(ctx: commands.Context | discord.ApplicationContext):
     user = ctx.author
-    return any(
+    return isinstance(user, Member) and any(
         (
             user.id in CONFIG["owner_ids"],
             user.guild_permissions.administrator,

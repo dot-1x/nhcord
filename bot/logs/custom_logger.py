@@ -1,5 +1,7 @@
 import logging
+import os
 import time
+from pathlib import Path
 
 
 class CustomFormatter(logging.Formatter):
@@ -41,5 +43,24 @@ class BotLogger(logging.Logger):
         )
         file_handle.setLevel(logging.DEBUG)
         file_handle.setFormatter(logging.Formatter(CustomFormatter.formatstr))
+        self.addHandler(file_handle)
+        self.addHandler(console_hndl)
+
+
+class MailLogger(logging.Logger):
+    def __init__(self, name: str) -> None:
+        super().__init__(name, logging.INFO)
+        console_hndl = logging.StreamHandler()
+        console_hndl.setLevel(logging.INFO)
+        console_hndl.setFormatter(logging.Formatter("%(name)s - %(message)s"))
+        log_path = Path(f"bot/logs/{name}/{name}-logs.log")
+        if not log_path.exists():
+            os.mkdir(os.getcwd() + f"/bot/logs/{name}")
+        # watch for the path
+        file_handle = logging.FileHandler(
+            f"bot/logs/{name}/{name}-logs.log",
+            encoding="utf-8",
+        )
+        file_handle.setLevel(logging.INFO)
         self.addHandler(file_handle)
         self.addHandler(console_hndl)
