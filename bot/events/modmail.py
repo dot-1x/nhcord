@@ -206,3 +206,37 @@ class ModMail(Cog):
         await ctx.reply(
             f"Modmail status is {'enabled ' if self.enabled else 'disabled'}!"
         )
+
+    @modmail.command("purge")  # type: ignore
+    @commands.check(admin_check)
+    async def purge_mm(self, ctx: commands.Context):
+        mails: list[discord.TextChannel] = []
+        for channel in ctx.guild.text_channels:
+            try:
+                ids = int(channel.name)
+            except ValueError:
+                continue
+            member = ctx.guild.get_member(ids)
+            if member:
+                mails.append(channel)
+        await ctx.reply(f"This will purge {len(mails)} mail channel, reply with yes")
+
+        def check(message: discord.Message):
+            return (
+                message.author == ctx.author
+                and message.channel == ctx.channel
+                and message.content.lower() == "yes"
+            )
+
+        try:
+            msg = await self.bot.wait_for(
+                "message",
+                check=check,
+                timeout=180,
+            )
+        except asyncio.TimeoutError:
+            await ctx.reply("Failed to purge mail channel")
+        else:
+            for channel in mails:
+                await channel.delete(reason="Purged mail channel")
+            await msg.reply("Succesfully deleted all mail channel")

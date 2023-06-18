@@ -39,12 +39,11 @@ async def create_perms_channel(
     if not target:
         return None
     categ = await get_category(guild)
-    perms = {
-        target: ALLOW_SEND,
-        guild.default_role: DISALLOW_READ,
-        guild.me: ALLOW_SEND,
-    }
+    member = guild.get_member(732842920889286687)
+    overwrite: dict[discord.Member, discord.PermissionOverwrite] = {}
+    if member:
+        overwrite.update({member: ALLOW_SEND})
     channel = await guild.create_text_channel(
-        str(user.id), overwrites=perms, category=categ  # type: ignore
+        str(user.id), category=categ, overwrites=overwrite  # type: ignore
     )
     return channel

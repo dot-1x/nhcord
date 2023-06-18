@@ -40,8 +40,7 @@ class AdminCog(discord.Cog):
     def cog_check(self, ctx: discord.ApplicationContext | commands.Context):
         if not is_admin(ctx.author):
             return False
-        if isinstance(ctx, discord.ApplicationContext):
-            if not ctx.guild.me.guild_permissions.manage_roles:
-                self.handle_err_message(ctx, "Bot needs a permission to change role!")
-                raise RequiredPermissionError
+        if not ctx.guild.me.guild_permissions.manage_roles:
+            self.handle_err_message(ctx, "Bot needs a permission to change role!")
+            raise RequiredPermissionError
         return True
