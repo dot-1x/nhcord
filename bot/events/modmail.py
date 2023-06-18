@@ -219,6 +219,8 @@ class ModMail(Cog):
             member = ctx.guild.get_member(ids)
             if member:
                 mails.append(channel)
+        if not mails:
+            return await ctx.reply("No mail channel found!")
         await ctx.reply(f"This will purge {len(mails)} mail channel, reply with yes")
 
         def check(message: discord.Message):
@@ -239,4 +241,19 @@ class ModMail(Cog):
         else:
             for channel in mails:
                 await channel.delete(reason="Purged mail channel")
-            await msg.reply("Succesfully deleted all mail channel")
+            await msg.reply(f"Succesfully deleted {len(mails)} mail channel")
+
+    @modmail.command("delete")  # type: ignore
+    @commands.check(admin_check)
+    async def delete_mm(self, ctx: commands.Context):
+        mails: list[discord.TextChannel] = []
+        for channel in ctx.guild.text_channels:
+            try:
+                ids = int(channel.name)
+            except ValueError:
+                continue
+            member = ctx.guild.get_member(ids)
+            if member:
+                mails.append(channel)
+        if not mails:
+            return await ctx.reply("No mail channel found!")
