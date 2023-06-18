@@ -13,8 +13,7 @@ from ..config import CONFIG
 from ..models.modmail.mail import ActiveMail
 from ..models.modmail.ticket import Ticket
 from ..utils.check import admin_check, is_admin
-from ..utils.modmail_utils import (ALLOW_READ, CREATE_TICKET_MSG,
-                                   create_perms_channel)
+from ..utils.modmail_utils import ALLOW_READ, CREATE_TICKET_MSG, create_perms_channel
 
 if TYPE_CHECKING:
     from ..bot import NhCord
@@ -114,7 +113,10 @@ class ModMail(Cog):
         if not mail:
             mail = await ActiveMail.create_mail(guild, self.bot, author)
             self.bot.mails.update({author.id: mail})
-        urls = [file.url for file in msg.attachments]
+
+        urls = [
+            file.url for file in msg.attachments if not file.filename.endswith(".exe")
+        ]
         await mail.send_log(msg.content, urls)
 
     async def listen_mail(self, channel: discord.TextChannel, content: str):

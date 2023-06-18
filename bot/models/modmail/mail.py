@@ -23,19 +23,20 @@ class ActiveMail:
     async def send_log(self, content: str, file_urls: list[str]):
         if not self.log:
             self.log = MailLogger(self.sender.name)
+        urls = "\n".join(file_urls)
         emb = discord.Embed(
-            description=content if content else "No content provided",
+            description=f"{content}",
             colour=discord.Colour.green(),
             timestamp=datetime.now(),
         )
         emb.set_author(name=self.sender.name, icon_url=self.sender.display_avatar.url)
-        await self.channel.send(
-            content="Attachments:\n" + "\n".join(file_urls) if file_urls else None,
-            embed=emb,
-        )
-        self.log.info(content)
+        if content:
+            await self.channel.send(embed=emb)
+            self.log.info(content)
         if file_urls:
-            self.log.info("Send an attachment file")
+            emb.description = urls
+            await self.channel.send(embed=emb)
+            self.log.info("Send an attachment file:\n%s", urls)
 
     @classmethod
     async def create_mail(

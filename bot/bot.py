@@ -71,6 +71,7 @@ class NhCord(commands.Bot):  # pylint: disable=R0901
         if isinstance(exception, commands.CheckFailure):
             return await context.reply("You cannot perform this action")
         if isinstance(exception, commands.CommandNotFound):
+            self.log.warning("Command not found!")
             return await context.reply("Command not found!")
         self.log.critical("An Error Occured!")
         self.log_exc(context, exception)
