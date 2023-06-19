@@ -5,7 +5,7 @@ import secrets
 from typing import TYPE_CHECKING
 
 import discord
-from discord import Cog
+from discord import Cog, option
 from discord.ext import commands
 from discord.interactions import Interaction
 
@@ -82,7 +82,53 @@ class TicketView(discord.ui.View):
         )
 
 
+class MailSelectView(discord.ui.View):
+    def __init__(self, bot: NhCord, guild: discord.Guild):
+        super().__init__(timeout=60, disable_on_timeout=True)
+        self.bot = bot
+        self.guild = guild
+        self.selected: list[discord.TextChannel] = []
+
+    @discord.ui.select(
+        discord.ComponentType.channel_select,
+        placeholder="Select mail channel",
+        max_values=25,
+    )
+    async def mail_select(
+        self, select: discord.ui.Select, interaction: discord.Interaction
+    ):
+        selected = [
+            channel
+            for channel in select.values
+            if isinstance(channel, discord.TextChannel) and channel.name.isnumeric()
+        ]
+        await interaction.response.send_message(
+            content=f"Selected {len(selected)} text channel", ephemeral=True
+        )
+        self.selected = selected
+
+    @discord.ui.button(label="Confirm", style=discord.ButtonStyle.primary)
+    async def confirm(self, _, interaction: discord.Interaction):
+        await interaction.response.defer()
+        counter = 0
+        for channel in self.selected:
+            if int(channel.name) in self.bot.mails:
+                mail = self.bot.mails.pop(int(channel.name))
+                await mail.channel.delete(reason="Purged mail channel")
+                del mail
+                counter += 1
+            elif self.guild.get_member(int(channel.name)):
+                await channel.delete(reason="Purged mail channel")
+                counter += 1
+        self.disable_all_items()
+        self.stop()
+        await interaction.message.edit(view=self)  # type: ignore
+        await interaction.followup.send(f"Deleted {counter} mail channels")
+
+
 class ModMail(Cog):
+    SlashMail = discord.SlashCommandGroup(name="modmail", checks=[admin_check])
+
     def __init__(self, bot: NhCord) -> None:
         self.bot = bot
         self.enabled = True
@@ -228,32 +274,63 @@ class ModMail(Cog):
         if msg:
             for channel in mails:
                 await channel.delete(reason="Purged mail channel")
+                self.bot.mails.clear()
             await msg.reply(f"Succesfully deleted {len(mails)} mail channel")
 
-    @modmail.command("delete")  # type: ignore
-    @commands.check(admin_check)
-    async def delete_mm(self, ctx: commands.Context, ids: str):
-        try:
-            channel = ctx.guild.get_channel(int(ids))
-            if not channel:
-                return await ctx.reply("Mail channel not found")
-            member = ctx.guild.get_member(int(channel.name))
-            if not member:
-                return await ctx.reply(
-                    f"Cannot find member for mail: {channel.mention}"
-                )
-        except ValueError:
-            return await ctx.reply("Invalid ID")
-        await ctx.reply(
-            f"This will delete {channel.mention} mail channel, reply with yes"
-        )
-
-        msg = await self.check_response(ctx)
-        if msg:
-            await channel.delete(reason="Delete mail channel")
-            await msg.reply(
-                f"Succesfully deleted mail channel for member: {member.mention}"
+    @SlashMail.command(name="purge", description="Purge mail channel")
+    @option(
+        name="all_",
+        type=bool,
+        defailt=False,
+        description="Set whether to delete all or not",
+    )
+    async def smm_purge(self, ctx: discord.ApplicationContext, all_: bool = False):
+        if all_:
+            counter = 0
+            while self.bot.mails:
+                _, mail = self.bot.mails.popitem()
+                await mail.channel.delete(reason="Purged mail channel")
+                counter += 1
+            return await ctx.respond(
+                f"Succesfully deleted {counter} mail channel"
+                if counter > 0
+                else "No mail channel deleted"
             )
+        await ctx.respond(view=MailSelectView(self.bot, ctx.guild))
+
+    @SlashMail.command(
+        name="delete", description="Delete modmail channel, fill by user or channel"
+    )
+    @option(name="user", type=discord.Member, description="Sender mail to delete")
+    @option(
+        name="channel", type=discord.TextChannel, description="Mail channel to delete"
+    )
+    async def smm_delete(
+        self,
+        ctx: discord.ApplicationContext,
+        user: discord.Member | None = None,
+        channel: discord.TextChannel | None = None,
+    ):
+        mail: ActiveMail | None = None
+        if user and channel:
+            return await ctx.respond("Fill only by user or channel")
+        if user and user.id in self.bot.mails:
+            mail = self.bot.mails.pop(user.id)
+
+        if channel and channel.name.isnumeric():
+            # check channel name in mails map
+            if int(channel.name) in self.bot.mails:
+                mail = self.bot.mails.pop(int(channel.name))
+            # check by member
+            elif ctx.guild.get_member(int(channel.name)):
+                mail = ActiveMail(
+                    self.bot, ctx.guild.get_member(int(channel.name)), channel
+                )
+        if not mail:
+            return await ctx.respond("Mail not found!")
+        await mail.channel.delete(reason="Deleted mail channel")
+        await ctx.respond(f"Succesfully deleted mail channel for: {mail.sender}")
+        del mail
 
     async def check_response(self, ctx: commands.Context):
         def check(message: discord.Message):

@@ -45,15 +45,9 @@ async def create_perms_channel(
     if not target:
         raise ValueError("Member not found!")
     categ = await get_category(guild)
-    perm_role = [role for role in guild.roles if is_role_admin(role)]
-    overwrite: dict[discord.Member | discord.Role, discord.PermissionOverwrite] = {
-        guild.default_role: DISALLOW_READ,
-        guild.me: ALLOW_SEND,
-        **{role: ALLOW_SEND for role in perm_role},
-    }
-    if allow_target:
-        overwrite.update({target: ALLOW_SEND})
     channel = await guild.create_text_channel(
-        str(user.id), category=categ, overwrites=overwrite  # type: ignore
+        str(user.id), category=categ  # type: ignore
     )
+    if allow_target:
+        await channel.set_permissions(target, overwrite=ALLOW_SEND)
     return channel

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -21,6 +21,7 @@ class ActiveMail:
     sender: discord.User | discord.Member
     channel: discord.TextChannel
     log: MailLogger | None = None
+    last_seen: datetime = field(default=datetime.now())
 
     async def send_log(self, content: str, file_urls: list[str]):
         if not self.log:
@@ -32,6 +33,7 @@ class ActiveMail:
             timestamp=datetime.now(),
         )
         emb.set_author(name=self.sender.name, icon_url=self.sender.display_avatar.url)
+        self.last_seen = datetime.now()
         if content:
             await self.channel.send(embed=emb)
             self.log.info(content)
