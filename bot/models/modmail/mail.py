@@ -7,7 +7,9 @@ from typing import TYPE_CHECKING
 import discord
 
 from bot.logs.custom_logger import MailLogger
-from bot.utils.modmail_utils import get_category, DISALLOW_READ, ALLOW_SEND
+from bot.utils.modmail_utils import (
+    create_perms_channel,
+)
 
 if TYPE_CHECKING:
     from bot.bot import NhCord
@@ -45,15 +47,16 @@ class ActiveMail:
         bot: NhCord,
         sender: discord.User | discord.Member,
     ):
-        categ = await get_category(guild)
-        member = guild.get_member(732842920889286687)
-        overwrite: dict[discord.Member | discord.Role, discord.PermissionOverwrite] = {
-            guild.default_role: DISALLOW_READ,
-            guild.me: ALLOW_SEND,
-        }
-        if member:
-            overwrite.update({member: ALLOW_SEND})
-            channel = await guild.create_text_channel(
-                str(sender.id), category=categ, overwrites=overwrite
-            )
+        channel = await create_perms_channel(guild, sender)
         return cls(bot, sender, channel)
+
+    @classmethod
+    def update_mail(
+        cls,
+        bot: NhCord,
+        sender: discord.User | discord.Member,
+        channel: discord.TextChannel,
+    ):
+        mail = cls(bot, sender, channel)
+        bot.mails.update({sender.id: mail})
+        return mail

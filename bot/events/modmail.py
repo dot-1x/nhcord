@@ -97,6 +97,12 @@ class ModMail(Cog):
         if author.bot or not self.enabled:
             return
 
+        guild = self.bot.get_guild(CONFIG["guild"])
+        if not guild:
+            self.enabled = False
+            raise ValueError("Guild not found")
+        if not guild.get_member(author.id):
+            return
         if msg.guild:
             if isinstance(msg.channel, discord.TextChannel):
                 try:
@@ -105,10 +111,6 @@ class ModMail(Cog):
                     return
                 return await self.listen_mail(msg.channel, msg.content)
             return
-        guild = self.bot.get_guild(CONFIG["guild"])
-        if not guild:
-            self.enabled = False
-            raise ValueError("Guild not found")
         mail = self.check_mail(guild, author)
         if not mail:
             mail = await ActiveMail.create_mail(guild, self.bot, author)
@@ -125,8 +127,8 @@ class ModMail(Cog):
             author = channel.guild.get_member(int(channel.name))
             if not author:
                 return
-            mail = ActiveMail(self.bot, author, channel)
-        await mail.sender.send(content)
+            mail = ActiveMail.update_mail(self.bot, author, channel)
+        await mail.sender.send(content)  # type: ignore
 
     def cog_check(self, ctx: discord.ApplicationContext | commands.Context):
         if not is_admin(ctx.author):
@@ -143,8 +145,7 @@ class ModMail(Cog):
 
         for text in guild.text_channels:
             if text.name == str(user.id):
-                mail = ActiveMail(self.bot, user, text)
-                self.bot.mails.update({user.id: mail})
+                mail = ActiveMail.update_mail(self.bot, user, text)
                 return mail
         return None
 
@@ -223,6 +224,38 @@ class ModMail(Cog):
             return await ctx.reply("No mail channel found!")
         await ctx.reply(f"This will purge {len(mails)} mail channel, reply with yes")
 
+        msg = await self.check_response(ctx)
+        if msg:
+            for channel in mails:
+                await channel.delete(reason="Purged mail channel")
+            await msg.reply(f"Succesfully deleted {len(mails)} mail channel")
+
+    @modmail.command("delete")  # type: ignore
+    @commands.check(admin_check)
+    async def delete_mm(self, ctx: commands.Context, ids: str):
+        try:
+            channel = ctx.guild.get_channel(int(ids))
+            if not channel:
+                return await ctx.reply("Mail channel not found")
+            member = ctx.guild.get_member(int(channel.name))
+            if not member:
+                return await ctx.reply(
+                    f"Cannot find member for mail: {channel.mention}"
+                )
+        except ValueError:
+            return await ctx.reply("Invalid ID")
+        await ctx.reply(
+            f"This will delete {channel.mention} mail channel, reply with yes"
+        )
+
+        msg = await self.check_response(ctx)
+        if msg:
+            await channel.delete(reason="Delete mail channel")
+            await msg.reply(
+                f"Succesfully deleted mail channel for member: {member.mention}"
+            )
+
+    async def check_response(self, ctx: commands.Context):
         def check(message: discord.Message):
             return (
                 message.author == ctx.author
@@ -231,29 +264,11 @@ class ModMail(Cog):
             )
 
         try:
-            msg = await self.bot.wait_for(
+            msg: discord.Message = await self.bot.wait_for(
                 "message",
                 check=check,
-                timeout=180,
+                timeout=30,
             )
         except asyncio.TimeoutError:
-            await ctx.reply("Failed to purge mail channel")
-        else:
-            for channel in mails:
-                await channel.delete(reason="Purged mail channel")
-            await msg.reply(f"Succesfully deleted {len(mails)} mail channel")
-
-    @modmail.command("delete")  # type: ignore
-    @commands.check(admin_check)
-    async def delete_mm(self, ctx: commands.Context):
-        mails: list[discord.TextChannel] = []
-        for channel in ctx.guild.text_channels:
-            try:
-                ids = int(channel.name)
-            except ValueError:
-                continue
-            member = ctx.guild.get_member(ids)
-            if member:
-                mails.append(channel)
-        if not mails:
-            return await ctx.reply("No mail channel found!")
+            return None
+        return msg

@@ -13,7 +13,6 @@ def is_admin(user: Member):
             user.guild_permissions.manage_messages,
             user.guild_permissions.manage_channels,
             user.guild_permissions.manage_roles,
-            user.guild_permissions.manage_guild,
         )
     )
 
@@ -24,7 +23,6 @@ def is_role_admin(role: Role):
             role.permissions.manage_messages,
             role.permissions.manage_channels,
             role.permissions.manage_roles,
-            role.permissions.manage_guild,
         )
     )
 
@@ -38,6 +36,5 @@ def admin_check(ctx: commands.Context | discord.ApplicationContext):
             user.guild_permissions.manage_messages,
             user.guild_permissions.manage_channels,
             user.guild_permissions.manage_roles,
-            user.guild_permissions.manage_guild,
         )
     )
