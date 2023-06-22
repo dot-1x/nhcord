@@ -52,7 +52,9 @@ class MailLogger(logging.Logger):
         super().__init__(name, logging.INFO)
         console_hndl = logging.StreamHandler()
         console_hndl.setLevel(logging.INFO)
-        console_hndl.setFormatter(logging.Formatter("%(name)s - %(message)s"))
+        console_hndl.setFormatter(
+            logging.Formatter("%(name)s - %(message)s - at %(asctime)s")
+        )
         log_path = Path(f"bot/logs/{name}/{name}-logs.log")
         if not log_path.exists():
             os.mkdir(os.getcwd() + f"/bot/logs/{name}")

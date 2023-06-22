@@ -9,14 +9,18 @@ from discord import Cog, option
 from discord.ext import commands
 from discord.interactions import Interaction
 
+from bot.logs.custom_logger import BotLogger
+
 from ..config import CONFIG
 from ..models.modmail.mail import ActiveMail
 from ..models.modmail.ticket import Ticket
 from ..utils.check import admin_check, is_admin
-from ..utils.modmail_utils import ALLOW_READ, CREATE_TICKET_MSG, create_perms_channel
+from ..utils.modmail_utils import ALLOW_READ, create_perms_channel
 
 if TYPE_CHECKING:
     from ..bot import NhCord
+
+_log = BotLogger("[MODMAIL]")
 
 
 class TicketModal(discord.ui.Modal):
@@ -127,7 +131,9 @@ class MailSelectView(discord.ui.View):
 
 
 class ModMail(Cog):
-    SlashMail = discord.SlashCommandGroup(name="modmail", checks=[admin_check])
+    SlashMail = discord.SlashCommandGroup(
+        name="modmail", checks=[admin_check], guild_only=True
+    )
 
     def __init__(self, bot: NhCord) -> None:
         self.bot = bot
@@ -155,7 +161,7 @@ class ModMail(Cog):
                     int(msg.channel.name)
                 except ValueError:
                     return
-                return await self.listen_mail(msg.channel, msg.content)
+                return await self.listen_mail(msg.channel, msg.content, msg.author)
             return
         mail = self.check_mail(guild, author)
         if not mail:
@@ -167,14 +173,19 @@ class ModMail(Cog):
         ]
         await mail.send_log(msg.content, urls)
 
-    async def listen_mail(self, channel: discord.TextChannel, content: str):
+    async def listen_mail(
+        self,
+        channel: discord.TextChannel,
+        content: str,
+        answer_by: discord.Member | discord.User,
+    ):
         mail = self.bot.mails.get(int(channel.name))
         if not mail:
             author = channel.guild.get_member(int(channel.name))
             if not author:
                 return
             mail = ActiveMail.update_mail(self.bot, author, channel)
-        await mail.sender.send(content)  # type: ignore
+        await mail.answer(content, answer_by)  # type: ignore
 
     def cog_check(self, ctx: discord.ApplicationContext | commands.Context):
         if not is_admin(ctx.author):
@@ -218,18 +229,18 @@ class ModMail(Cog):
             await asyncio.sleep(60)
             await ctx.channel.delete()
 
-    @commands.command("ticekt")
-    @commands.dm_only()
-    async def start_ticket(self, ctx: commands.Context):
-        registered = self.is_registered(ctx.author.id)
-        if registered:
-            return await ctx.reply(
-                f"A ticket already registered on: {registered.ticket_channel.mention}"
-            )
-        await ctx.reply(
-            CREATE_TICKET_MSG.format(author=ctx.author.mention),
-            view=TicketView(self.bot),
-        )
+    # @commands.command("ticekt")
+    # @commands.dm_only()
+    # async def start_ticket(self, ctx: commands.Context):
+    #     registered = self.is_registered(ctx.author.id)
+    #     if registered:
+    #         return await ctx.reply(
+    #             f"A ticket already registered on: {registered.ticket_channel.mention}"
+    #         )
+    #     await ctx.reply(
+    #         CREATE_TICKET_MSG.format(author=ctx.author.mention),
+    #         view=TicketView(self.bot),
+    #     )
 
     @commands.group(name="mm")  # type: ignore
     async def modmail(self, _: commands.Context):
@@ -314,23 +325,21 @@ class ModMail(Cog):
         mail: ActiveMail | None = None
         if user and channel:
             return await ctx.respond("Fill only by user or channel")
-        if user and user.id in self.bot.mails:
-            mail = self.bot.mails.pop(user.id)
-
-        if channel and channel.name.isnumeric():
-            # check channel name in mails map
-            if int(channel.name) in self.bot.mails:
-                mail = self.bot.mails.pop(int(channel.name))
-            # check by member
-            elif ctx.guild.get_member(int(channel.name)):
-                mail = ActiveMail(
-                    self.bot, ctx.guild.get_member(int(channel.name)), channel
-                )
+        if not user and not channel and isinstance(ctx.channel, discord.TextChannel):
+            mail = self.get_mail_by_channel(ctx.guild, ctx.channel)
+        elif user and user.id in self.bot.mails:
+            mail = self.bot.mails[user.id]
+        elif channel:
+            mail = self.get_mail_by_channel(ctx.guild, channel)
         if not mail:
             return await ctx.respond("Mail not found!")
+        _log.info("%s deleted mail channel for %s", ctx.author, mail.sender)
+        await ctx.respond(f"Deleting mail channel for: {mail.sender}", ephemeral=True)
         await mail.channel.delete(reason="Deleted mail channel")
-        await ctx.respond(f"Succesfully deleted mail channel for: {mail.sender}")
-        del mail
+        try:
+            del self.bot.mails[mail.sender.id]
+        except ValueError:
+            pass
 
     async def check_response(self, ctx: commands.Context):
         def check(message: discord.Message):
@@ -349,3 +358,11 @@ class ModMail(Cog):
         except asyncio.TimeoutError:
             return None
         return msg
+
+    def get_mail_by_channel(self, guild: discord.Guild, channel: discord.TextChannel):
+        if not channel.name.isnumeric():
+            return None
+        member = guild.get_member(int(channel.name))
+        if not member:
+            return None
+        return self.bot.mails.get(member.id, ActiveMail(self.bot, member, channel))

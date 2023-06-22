@@ -42,6 +42,14 @@ class ActiveMail:
             await self.channel.send(embed=emb)
             self.log.info("Send an attachment file:\n%s", urls)
 
+    async def answer(self, content: str, answer_by: discord.User | discord.Member):
+        if not content:
+            return
+        if not self.log:
+            self.log = MailLogger(self.sender.name)
+        self.log.info("%s - %s", answer_by, content)
+        await self.sender.send(content)
+
     @classmethod
     async def create_mail(
         cls,
