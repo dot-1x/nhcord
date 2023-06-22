@@ -328,7 +328,7 @@ class ModMail(Cog):
         if not user and not channel and isinstance(ctx.channel, discord.TextChannel):
             mail = self.get_mail_by_channel(ctx.guild, ctx.channel)
         elif user and user.id in self.bot.mails:
-            mail = self.bot.mails[user.id]
+            mail = self.bot.mails.pop(user.id)
         elif channel:
             mail = self.get_mail_by_channel(ctx.guild, channel)
         if not mail:
@@ -336,10 +336,7 @@ class ModMail(Cog):
         _log.info("%s deleted mail channel for %s", ctx.author, mail.sender)
         await ctx.respond(f"Deleting mail channel for: {mail.sender}", ephemeral=True)
         await mail.channel.delete(reason="Deleted mail channel")
-        try:
-            del self.bot.mails[mail.sender.id]
-        except ValueError:
-            pass
+        del mail
 
     async def check_response(self, ctx: commands.Context):
         def check(message: discord.Message):
@@ -365,4 +362,4 @@ class ModMail(Cog):
         member = guild.get_member(int(channel.name))
         if not member:
             return None
-        return self.bot.mails.get(member.id, ActiveMail(self.bot, member, channel))
+        return self.bot.mails.pop(member.id, ActiveMail(self.bot, member, channel))
